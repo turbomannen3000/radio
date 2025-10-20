@@ -165,49 +165,61 @@
   }
 
   async function api(path){
-    // prova aktiv spegel, annars rulla vidare
-    const tries = [RB, ...RB_MIRRORS.filter(u=>u!==RB)];
-    const headers = { 'accept':'application/json' };
-    for(const base of tries){
-      try{
-        const r = await fetch(base + path, {headers});
-        if(r.ok){ RB = base; return await r.json(); }
-      }catch(e){ /* continue */ }
-    }
-    throw new Error('API otillgängligt just nu');
+  const tries = [RB, ...RB_MIRRORS.filter(u=>u!==RB)];
+  for (const base of tries){
+    try{
+      const r = await fetch(base + path); // inga specialheaders → enklare CORS
+      if (r.ok){ RB = base; return await r.json(); }
+    }catch(_){ /* prova nästa spegel */ }
   }
+  throw new Error('API otillgängligt just nu');
+}
 
   // ======= Sök och listor =======
   async function search(q){
-    $('#results').innerHTML='';
-    $('#resultsEmpty').style.display='none';
-    const params = new URLSearchParams({
-      limit: '36',
-      hidebroken: 'true',
-      order: 'clickcount',
-      reverse: 'true'
-    });
-    // enkel heuristik: om q är 2 bokstäver → landkod
-    if(/^[A-Za-z]{2}$/.test(q.trim())) params.set('countrycode', q.trim().toUpperCase());
-    else {
-      params.set('name', q);
-      params.set('tag', q);
-    }
-    const list = await api('/json/stations/search?' + params.toString());
-    if(!list.length){ $('#resultsEmpty').style.display='block'; return; }
-    const frag = document.createDocumentFragment();
-    list.forEach(st=> frag.append(stationCard(st)));
-    $('#results').append(frag);
-  }
+  $('#results').innerHTML='';
+  $('#resultsEmpty').style.display='none';
 
-  async function listTop(){
-    $('#results').innerHTML='';
-    $('#resultsEmpty').style.display='none';
-    const list = await api('/json/stations/lastclick/36?hidebroken=true');
+  const params = new URLSearchParams({
+    limit:'36',
+    hidebroken:'true',
+    order:'clickcount',
+    reverse:'true'
+  });
+
+  const query = q.trim();
+  try{
+    if (/^[A-Za-z]{2}$/.test(query)) {
+      params.set('countrycode', query.toUpperCase());
+    } else {
+      // Bred sökning – istället för att AND:a name + tag
+      params.set('searchterm', query);
+    }
+
+    let list = await api('/json/stations/search?' + params.toString());
+
+    // Fallbacks om tomt: prova namn/tag separat
+    if ((!list || !list.length) && query){
+      try { list = await api('/json/stations/byname/' + encodeURIComponent(query) + '?limit=36&hidebroken=true'); } catch {}
+    }
+    if ((!list || !list.length) && query){
+      try { list = await api('/json/stations/bytag/' + encodeURIComponent(query) + '?limit=36&hidebroken=true'); } catch {}
+    }
+
+    if (!list || !list.length){
+      $('#resultsEmpty').style.display='block';
+      return;
+    }
+
     const frag = document.createDocumentFragment();
-    list.forEach(st=> frag.append(stationCard(st)));
+    list.forEach(st => frag.append(stationCard(st)));
     $('#results').append(frag);
+  }catch(err){
+    console.error(err);
+    $('#resultsEmpty').style.display='block';
+    $('#resultsEmpty').textContent = 'Kunde inte hämta stationer just nu. Testa igen eller klicka på “Populära just nu”.';
   }
+}
 
   // ======= Spelare =======
   const audio = $('#audio');
