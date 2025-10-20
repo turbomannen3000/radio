@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>World Radio — enkel webbradio</title>
+  <meta name="description" content="Lyssna på radiostationer från hela världen. Sök, spela och spara favoriter. Visar 'Now Playing' för favoriter via proxy.">
+  <link rel="preconnect" href="https://de1.api.radio-browser.info" crossorigin>
+  <link rel="preconnect" href="https://nl1.api.radio-browser.info" crossorigin>
+  <style>
+    :root{--bg:#0b0c10;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--accent-2:#22c55e;--border:#222433;}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);background:radial-gradient(1200px 600px at 15% -10%,#1c1d28 0,transparent 60%),
+    radial-gradient(900px 450px at 110% 10%,#0f172a 0,transparent 55%),var(--bg)}
+    header{position:sticky;top:0;background:rgba(11,12,16,.7);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px 16px}
+    .title{display:flex;gap:10px;align-items:center;font-weight:700}
+    .title svg{opacity:.85}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.05));border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;gap:10px;align-items:flex-start}
+    .card:hover{border-color:#2a2d40}
+    .station-cover{flex:0 0 auto;width:48px;height:48px;border-radius:12px;background:#0e0f15;border:1px solid var(--border);display:grid;place-items:center;overflow:hidden}
+    .station-cover img{width:100%;height:100%;object-fit:cover}
+    .muted{color:var(--muted)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    input[type="search"], select{background:#0e0f15;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:12px;width:100%}
+    .controls{display:grid;grid-template-columns:1fr auto auto;gap:10px;margin-top:10px}
+    .btn{background:#10121a;border:1px solid var(--border);padding:8px 12px;border-radius:12px;color:var(--text);cursor:pointer}
+    .btn:hover{border-color:#2a2d40}
+    .btn.primary{background:linear-gradient(180deg,#4f46e5,#4338ca);border:none}
+    .btn.ghost{background:transparent;border:1px dashed #2a2d40}
+    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:4px 8px;border-radius:999px;font-size:12px;color:var(--muted)}
+    .h{margin:18px 0 10px;font-size:14px;color:#aab3d0;text-transform:uppercase;letter-spacing:.12em}
+    .audio{position:sticky;bottom:0;background:rgba(11,12,16,.85);backdrop-filter:blur(8px);border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:12px;align-items:center}
+    .audio .meta{min-width:0}
+    .meta .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .nopad{padding-top:4px}
+    .small{font-size:12px}
+    .now{font-size:13px;color:#b1ffd2}
+    .empty{opacity:.7;border:1px dashed var(--border);border-radius:12px;padding:18px;text-align:center}
+    .link{color:#9ca3ff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 8l14-5v3L5 11V8z" fill="currentColor"/><path d="M19 11.5a1.5 1.5 0 10-3 0v7a1.5 1.5 0 103 0v-7zM6 12h8v7H6z" fill="currentColor"/></svg>
+        <div>
+          <div>World Radio</div>
+          <div class="muted small">Sök, spela & spara favoriter</div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <input id="q" type="search" placeholder="Sök station, land eller tagg (t.ex. 'jazz', 'Sweden', 'bbc')" />
+        <button class="btn" id="btnSearch">Sök</button>
+        <button class="btn ghost" id="btnTop">Populära just nu</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2 class="h">Resultat</h2>
+      <div id="results" class="grid"></div>
+      <div id="resultsEmpty" class="empty" style="display:none">Inga träffar ännu — sök efter en station eller tryck på <em>Populära just nu</em>.</div>
+    </section>
+
+    <section class="nopad">
+      <h2 class="h">Favoriter</h2>
+      <div id="favs" class="grid"></div>
+      <div id="favsEmpty" class="empty">Inga favoriter än. Lägg till någon station så visas den här och uppdateras med låtinfo i realtid.</div>
+    </section>
+  </main>
+
+  <div class="audio" id="playerBar" style="display:none">
+    <div class="station-cover" id="playerCover"></div>
+    <div class="meta">
+      <div class="name" id="playerName">—</div>
+      <div class="muted small" id="playerDetails">—</div>
+    </div>
+    <div style="margin-left:auto"></div>
+    <button class="btn" id="btnPausePlay">⏸︎</button>
+    <a class="btn" id="btnHome" target="_blank" rel="noopener">Öppna webbplats</a>
+  </div>
+
+  <audio id="audio" crossorigin="anonymous"></audio>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" integrity="sha256-L1TQfXGq8hZsmH5i0G4EoFpaU6zERy3nN8vF2KdfnC8=" crossorigin="anonymous"></script>
+  <script>
+  // ======= Konfiguration =======
+  // Sätt denna till din Worker/Proxy (exempel: https://now.turbomannen.workers.dev)
+  const NOWPLAYING_PROXY = localStorage.getItem('wr_now_proxy') || '';
+  // Du kan tillfälligt ange här om du vill testa utan att sätta i localStorage:
+  // const NOWPLAYING_PROXY = 'https://<din-worker>/now';
+
+  const RB_MIRRORS = [
+    'https://de1.api.radio-browser.info',
+    'https://nl1.api.radio-browser.info',
+    'https://fr1.api.radio-browser.info',
+    'https://us1.api.radio-browser.info'
+  ];
+  let RB = RB_MIRRORS[Math.floor(Math.random()*RB_MIRRORS.length)];
+
+  // ======= Hjälpfunktioner =======
+  const $ = sel => document.querySelector(sel);
+  const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
+  const fmtTags = t => t ? t.split(',').slice(0,3).map(s=>s.trim()).filter(Boolean) : [];
+  const favKey = 'worldradio_favs_v1';
+  const getFavs = () => JSON.parse(localStorage.getItem(favKey)||'[]');
+  const setFavs = list => localStorage.setItem(favKey, JSON.stringify(list));
+
+  function stationCard(st){
+    const card = el('div','card');
+    const cover = el('div','station-cover');
+    if(st.favicon){ const img=new Image(); img.src=st.favicon; img.alt=''; cover.append(img);} else { cover.innerHTML='📻'; }
+    const body = el('div');
+    const name = el('div'); name.textContent = st.name || 'Okänd station';
+    const meta = el('div','muted small');
+    const parts = [];
+    if(st.countrycode) parts.push(st.countrycode);
+    if(st.language) parts.push(st.language.split(',')[0]);
+    if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:''));
+    meta.textContent = parts.join(' · ');
+    const tags = el('div','row');
+    fmtTags(st.tags).forEach(tag=>{ const p=el('span','pill'); p.textContent=tag; tags.append(p); });
+
+    const controls = el('div','controls');
+    const btnPlay = el('button','btn primary'); btnPlay.textContent='Spela';
+    const btnFav = el('button','btn'); btnFav.textContent='★'; btnFav.title='Lägg till favorit';
+    const btnHome = el('a','btn'); btnHome.textContent='Webbplats'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
+
+    btnPlay.addEventListener('click', ()=> playStation(st));
+    btnFav.addEventListener('click', ()=> addFav(st.stationuuid));
+
+    controls.append(btnPlay, btnFav, btnHome);
+    body.append(name, meta, tags, controls);
+    card.append(cover, body);
+    return card;
+  }
+
+  function favCard(st){
+    const card = el('div','card');
+    card.dataset.uuid = st.stationuuid;
+    const cover = el('div','station-cover');
+    if(st.favicon){ const img=new Image(); img.src=st.favicon; img.alt=''; cover.append(img);} else { cover.innerHTML='📻'; }
+
+    const body = el('div');
+    const name = el('div'); name.textContent = st.name || 'Okänd station';
+    name.style.fontWeight='600';
+    const now = el('div','now'); now.textContent = '—'; now.dataset.role='now';
+    const meta = el('div','muted small');
+    const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push(st.language.split(',')[0]);
+    meta.textContent = parts.join(' · ');
+
+    const rowBtns = el('div','row');
+    const btnPlay = el('button','btn'); btnPlay.textContent='Spela'; btnPlay.addEventListener('click',()=> playStation(st));
+    const btnRm = el('button','btn'); btnRm.textContent='Ta bort'; btnRm.addEventListener('click',()=> removeFav(st.stationuuid));
+    const btnHome = el('a','btn'); btnHome.textContent='Webbplats'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
+    rowBtns.append(btnPlay, btnRm, btnHome);
+
+    body.append(name, now, meta, rowBtns);
+    card.append(cover, body);
+    return card;
+  }
+
+  async function api(path){
+    // prova aktiv spegel, annars rulla vidare
+    const tries = [RB, ...RB_MIRRORS.filter(u=>u!==RB)];
+    const headers = { 'accept':'application/json' };
+    for(const base of tries){
+      try{
+        const r = await fetch(base + path, {headers});
+        if(r.ok){ RB = base; return await r.json(); }
+      }catch(e){ /* continue */ }
+    }
+    throw new Error('API otillgängligt just nu');
+  }
+
+  // ======= Sök och listor =======
+  async function search(q){
+    $('#results').innerHTML='';
+    $('#resultsEmpty').style.display='none';
+    const params = new URLSearchParams({
+      limit: '36',
+      hidebroken: 'true',
+      order: 'clickcount',
+      reverse: 'true'
+    });
+    // enkel heuristik: om q är 2 bokstäver → landkod
+    if(/^[A-Za-z]{2}$/.test(q.trim())) params.set('countrycode', q.trim().toUpperCase());
+    else {
+      params.set('name', q);
+      params.set('tag', q);
+    }
+    const list = await api('/json/stations/search?' + params.toString());
+    if(!list.length){ $('#resultsEmpty').style.display='block'; return; }
+    const frag = document.createDocumentFragment();
+    list.forEach(st=> frag.append(stationCard(st)));
+    $('#results').append(frag);
+  }
+
+  async function listTop(){
+    $('#results').innerHTML='';
+    $('#resultsEmpty').style.display='none';
+    const list = await api('/json/stations/lastclick/36?hidebroken=true');
+    const frag = document.createDocumentFragment();
+    list.forEach(st=> frag.append(stationCard(st)));
+    $('#results').append(frag);
+  }
+
+  // ======= Spelare =======
+  const audio = $('#audio');
+  let hls; let currentStation = null;
+  $('#btnPausePlay').addEventListener('click',()=>{
+    if(audio.paused){ audio.play(); $('#btnPausePlay').textContent='⏸︎'; }
+    else { audio.pause(); $('#btnPausePlay').textContent='▶︎'; }
+  });
+
+  async function playStation(st){
+    currentStation = st;
+    // rapportera klick och hämta resolved url (rekommenderat av API)
+    const info = await api('/json/url/' + encodeURIComponent(st.stationuuid));
+    const streamUrl = info?.url || st.url_resolved || st.url;
+    const isHls = /\.m3u8($|\?)/i.test(streamUrl) || st.hls === 1;
+
+    if(hls){ hls.destroy(); hls=null; }
+    audio.src = '';
+
+    if(isHls && window.Hls?.isSupported()){
+      hls = new Hls({maxBufferLength:20});
+      hls.loadSource(streamUrl);
+      hls.attachMedia(audio);
+    } else {
+      audio.src = streamUrl;
+    }
+    audio.play();
+
+    // UI
+    $('#playerBar').style.display='flex';
+    $('#playerName').textContent = st.name || 'Okänd station';
+    $('#playerDetails').textContent = [st.countrycode, st.codec ? (st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')) : null].filter(Boolean).join(' · ');
+    $('#btnPausePlay').textContent='⏸︎';
+    $('#btnHome').href = st.homepage || '#';
+    const cov = $('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
+  }
+
+  // ======= Favoriter =======
+  async function refreshFavs(){
+    const favs = getFavs();
+    $('#favs').innerHTML='';
+    $('#favsEmpty').style.display = favs.length ? 'none' : 'block';
+    if(!favs.length) return;
+    // hämta stationer i bulk
+    const uuids = favs.join(',');
+    const list = await api('/json/stations/byuuid?uuids=' + encodeURIComponent(uuids));
+    const frag = document.createDocumentFragment();
+    list.forEach(st=> frag.append(favCard(st)));
+    $('#favs').append(frag);
+    scheduleNowPlayingUpdate();
+  }
+
+  function addFav(uuid){
+    const favs = new Set(getFavs());
+    favs.add(uuid);
+    setFavs([...favs]);
+    refreshFavs();
+  }
+  function removeFav(uuid){
+    const favs = new Set(getFavs());
+    favs.delete(uuid);
+    setFavs([...favs]);
+    refreshFavs();
+  }
+
+  // ======= Now Playing (favoriter) via proxy =======
+  let npTimer;
+  function scheduleNowPlayingUpdate(){
+    clearInterval(npTimer);
+    if(!NOWPLAYING_PROXY){
+      document.querySelectorAll('[data-role="now"]').forEach(n=> n.textContent = 'Saknas: ställ in proxy för Now Playing');
+      return;
+    }
+    const tick = async ()=>{
+      const cards = Array.from($('#favs').children);
+      await Promise.all(cards.map(async card=>{
+        const uuid = card.dataset.uuid;
+        // hämta stream url (snabb-cache)
+        try{
+          const info = await api('/json/url/' + encodeURIComponent(uuid));
+          const streamUrl = info?.url;
+          if(!streamUrl) return;
+          const r = await fetch(NOWPLAYING_PROXY + '?stream=' + encodeURIComponent(streamUrl));
+          if(!r.ok) return;
+          const data = await r.json();
+          const txt = data && (data.title || data.now || data.streamTitle) ? (data.artist? (data.artist + ' – ' + (data.title||'')) : (data.title || data.now || data.streamTitle)) : '—';
+          const elNow = card.querySelector('[data-role="now"]');
+          elNow.textContent = txt || '—';
+        }catch(e){ /* ignore */ }
+      }));
+    };
+    tick();
+    npTimer = setInterval(tick, 15000);
+  }
+
+  // ======= Händelser =======
+  $('#btnSearch').addEventListener('click', ()=> {
+    const v = $('#q').value.trim(); if(v) search(v); else listTop();
+  });
+  $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
+  $('#btnTop').addEventListener('click', listTop);
+
+  // ======= Init =======
+  (async function init(){
+    try{ await listTop(); }catch(e){ $('#resultsEmpty').style.display='block'; }
+    refreshFavs();
+  })();
+  </script>
+</body>
+</html>
