@@ -2,14 +2,18 @@
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>World Radio — proxy-aktiverad</title>
   <meta name="description" content="Lyssna på radiostationer från hela världen. Sök via egen Cloudflare Worker-proxy. Spara favoriter.">
   <style>
     :root{--bg:#0b0c10;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--border:#222433}
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);background:radial-gradient(1200px 600px at 15% -10%,#1c1d28 0,transparent 60%),radial-gradient(900px 450px at 110% 10%,#0f172a 0,transparent 55%),var(--bg)}
+    html{ -webkit-text-size-adjust: 100%; }
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);
+      background:radial-gradient(1200px 600px at 15% -10%,#1c1d28 0,transparent 60%),radial-gradient(900px 450px at 110% 10%,#0f172a 0,transparent 55%),var(--bg);
+      touch-action: manipulation;
+    }
     header{position:sticky;top:0;background:rgba(11,12,16,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
     .wrap{max-width:1100px;margin:0 auto;padding:14px 12px}
     .title{display:flex;gap:8px;align-items:center;font-weight:700}
@@ -20,12 +24,16 @@
     .station-cover img{width:100%;height:100%;object-fit:cover}
     .muted{color:var(--muted)}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    input[type="search"]{background:#0e0f15;border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:10px;width:100%}
+    input[type="search"], select{
+      background:#0e0f15;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;width:100%;
+      font-size:16px; /* iOS anti-zoom */
+    }
     .controls{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px}
-    .btn{background:#10121a;border:1px solid var(--border);padding:7px 10px;border-radius:10px;color:var(--text);cursor:pointer}
+    .btn{background:#10121a;border:1px solid var(--border);padding:9px 12px;border-radius:10px;color:var(--text);cursor:pointer;font-size:16px}
     .btn:hover{border-color:#2a2d40}
     .btn.primary{background:linear-gradient(180deg,#4f46e5,#4338ca);border:none}
     .btn.small{padding:5px 8px;border-radius:8px}
+    .btn.ghost{background:transparent;border:1px dashed #2a2d40}
     .h{margin:16px 0 8px;font-size:13px;color:#aab3d0;text-transform:uppercase;letter-spacing:.12em}
     .audio{position:sticky;bottom:0;background:rgba(11,12,16,.92);backdrop-filter:blur(8px);border-top:1px solid var(--border);padding:6px 10px;display:flex;gap:8px;align-items:center}
     .audio .meta{min-width:0}
@@ -37,6 +45,8 @@
     .diag{margin-top:8px;font-size:12px;color:#fbbf24}
     .toast{position:fixed;right:12px;bottom:70px;background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
+    .actions-row{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:10px;flex-wrap:wrap}
+    .more-wrap{display:flex;justify-content:center;margin:12px 0}
   </style>
 </head>
 <body>
@@ -44,9 +54,12 @@
     <div class="wrap">
       <div class="title">World Radio — via proxy</div>
       <div class="row" style="margin-top:10px">
-        <input id="q" type="search" placeholder="Sök station, land eller tagg (t.ex. 'jazz', 'Sweden', 'bbc')" />
+        <input id="q" type="search" placeholder="Sök station eller tagg (t.ex. 'jazz', 'bbc')" autocomplete="off" />
+        <select id="country">
+          <option value="">Alla länder</option>
+        </select>
         <button class="btn" id="btnSearch">Sök</button>
-        <button class="btn" id="btnTop">Populära just nu</button>
+        <button class="btn" id="btnTop">Populärt</button>
         <button class="btn" id="btnDiag">Diagnostik</button>
       </div>
       <div id="diag" class="diag" style="display:none"></div>
@@ -57,7 +70,10 @@
     <section>
       <h2 class="h">Resultat</h2>
       <div id="results" class="grid"></div>
-      <div id="resultsEmpty" class="empty" style="display:none">Inga träffar ännu — sök efter en station (ex. "BBC", "Jazz", "Sverige") eller tryck på <em>Populära just nu</em>.</div>
+      <div id="resultsEmpty" class="empty" style="display:none">Inga träffar ännu — sök (ex. "BBC", "Jazz") eller tryck <em>Populärt</em>.</div>
+      <div class="more-wrap">
+        <button class="btn ghost" id="btnMore" style="display:none">Visa mer</button>
+      </div>
     </section>
 
     <section class="nopad">
@@ -87,7 +103,7 @@
   <audio id="audio" crossorigin="anonymous"></audio>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
-  // ======= Konfiguration: sätt din Worker-URL här =======
+  // ======= Konfiguration: byt till din Worker-URL =======
   const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev'; // <-- BYT UT DENNA
 
   // ======= Hjälp =======
@@ -142,29 +158,96 @@
     body.append(name, meta, rowBtns); card.append(cover, body); return card;
   }
 
+  // ======= Global state för Populärt (pagination 5 i taget) =======
+  const TOP_CHUNK = 5;
+  let topCache = [];    // senaste hämtade listan (array)
+  let topIndex = 0;     // nästa index att visa
+  let topKey = 'GLOBAL';// nyckel för cache (t.ex. landskod)
+
+  function resetTop(key){
+    topCache = [];
+    topIndex = 0;
+    topKey = key || 'GLOBAL';
+    $('#btnMore').style.display = 'none';
+  }
+
+  function renderTopChunk(){
+    const end = Math.min(topIndex + TOP_CHUNK, topCache.length);
+    const frag = document.createDocumentFragment();
+    for(let i=topIndex;i<end;i++){ frag.append(stationCard(topCache[i])); }
+    if(topIndex===0) $('#results').innerHTML='';
+    $('#results').append(frag);
+    $('#resultsEmpty').style.display = (topCache.length===0);
+    topIndex = end;
+    $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
+  }
+
   // ======= Sök & listor =======
   async function search(q){
-    $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
-    const enc = encodeURIComponent(q.trim());
+    $('#results').innerHTML=''; $('#resultsEmpty').style.display='none'; $('#btnMore').style.display='none';
+    const query = (q||'').trim();
+    const cc = $('#country').value.trim(); // ISO2 eller tomt
+    if(!query && cc){
+      // Om bara land valt → visa Populärt i landet
+      return listTop(cc);
+    }
+    if(!query){
+      return listTop('GLOBAL');
+    }
+    const enc = encodeURIComponent(query);
     const tasks = [];
-    if(!q){ return listTop(); }
-    // Kör flera varianter parallellt
-    tasks.push(api('/json/stations/byname/' + enc + '?hidebroken=true&order=clickcount&reverse=true&limit=60'));
-    tasks.push(api('/json/stations/bytag/' + enc + '?hidebroken=true&order=clickcount&reverse=true&limit=60'));
-    tasks.push(api('/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=' + enc));
+    // Stations/search med ev. landfilter
+    let base = `/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=${enc}`;
+    if(cc) base += `&countrycode=${encodeURIComponent(cc)}`;
+    tasks.push(api(base));
+    // Dessa hjälper ibland att hitta mer
+    tasks.push(api(`/json/stations/byname/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
+    tasks.push(api(`/json/stations/bytag/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
 
     const settled = await Promise.allSettled(tasks);
     const results = settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
     const seen = new Set(); const uniq = [];
     for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
+
     if(!uniq.length){ $('#resultsEmpty').style.display='block'; return; }
     const frag = document.createDocumentFragment(); uniq.slice(0,60).forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
   }
 
-  async function listTop(){
+  async function listTop(scope){
+    // scope: 'GLOBAL' eller ISO-landskod (SE, US, ...)
+    const isCountry = scope && scope !== 'GLOBAL';
+    const key = isCountry ? `TOP_${scope}` : 'GLOBAL';
+
+    if(topKey !== key) resetTop(key);
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
-    const list = await api('/json/stations/topclick?limit=36&hidebroken=true');
-    const frag = document.createDocumentFragment(); list.forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
+
+    if(topCache.length === 0){
+      // Hämta upp till 100 och paginera lokalt
+      let list = [];
+      if(isCountry){
+        list = await api(`/json/stations/bycountrycodeexact/${encodeURIComponent(scope)}?hidebroken=true&order=clickcount&reverse=true&limit=100`);
+      }else{
+        list = await api(`/json/stations/topclick?limit=100&hidebroken=true`);
+      }
+      topCache = Array.isArray(list) ? list : [];
+    }
+    renderTopChunk(); // visar 5 första
+  }
+
+  // ======= Länder (dropdown) =======
+  async function loadCountries(){
+    try{
+      const countries = await api('/json/countries?order=stationcount&reverse=true');
+      const sel = $('#country');
+      countries.forEach(c=>{
+        const opt = document.createElement('option');
+        opt.value = c.iso_3166_1 || c.countrycode || '';
+        // Fallback om iso-kod saknas
+        if(!opt.value && c.name && c.name.length===2) opt.value = c.name.toUpperCase();
+        opt.textContent = c.name + (c.stationcount ? ` (${c.stationcount})` : '');
+        if(opt.value) sel.appendChild(opt);
+      });
+    }catch(e){ /* ignore */ }
   }
 
   // ======= Spelare =======
@@ -179,12 +262,11 @@
     let streamUrl = st.url_resolved || st.url;
     // Hämta kanonisk URL via API
     try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{}
-    // Mixed content-fix: försök https om sidan är https och länken är http
+    // Mixed content-fix
     if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){
       const httpsTry = streamUrl.replace(/^http:\/\//i,'https://');
-      try{ const head = await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); streamUrl = httpsTry; }catch{}
+      try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); streamUrl = httpsTry; }catch{}
     }
-
     const isHls = /\.m3u8($|\?)/i.test(streamUrl);
     if(hls){ hls.destroy(); hls=null; }
     audio.src = '';
@@ -216,7 +298,6 @@
   async function refreshFavs(){
     const favs = getFavs();
     $('#favs').innerHTML=''; $('#favsEmpty').style.display = favs.length ? 'none' : 'block'; if(!favs.length) return;
-    // Försök hämta uppdaterad metadata, annars snapshot
     const uuids = favs.map(f=> f.uuid).join(',');
     let updated=[]; try{ updated = await api('/json/stations/byuuid?uuids=' + encodeURIComponent(uuids)); }catch{}
     const map = new Map(updated.map(s=> [s.stationuuid, s]));
@@ -235,10 +316,23 @@
   // ======= Händelser =======
   $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
-  $('#btnTop').addEventListener('click', listTop);
+  $('#btnTop').addEventListener('click', ()=> {
+    const cc = $('#country').value.trim();
+    listTop(cc || 'GLOBAL');
+  });
+  $('#btnMore').addEventListener('click', renderTopChunk);
+  $('#country').addEventListener('change', ()=>{
+    // Om vi är i Populärt-läget, ladda om top för land; annars filtra sökning
+    const q = $('#q').value.trim();
+    if(q) search(q); else listTop($('#country').value.trim() || 'GLOBAL');
+  });
 
   // ======= Init =======
-  (async function init(){ try{ await listTop(); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('Initfel: ' + e.message); } refreshFavs(); })();
+  (async function init(){
+    await loadCountries();
+    try{ await listTop('GLOBAL'); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('Initfel: ' + e.message); }
+    refreshFavs();
+  })();
   </script>
 </body>
 </html>
