@@ -24,7 +24,7 @@
     .station-cover img{width:100%;height:100%;object-fit:cover}
     .muted{color:var(--muted)}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    input[type="search"], select{
+    input[type=\"search\"], select{
       background:#0e0f15;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;width:100%;
       font-size:16px; /* iOS anti-zoom */
     }
@@ -40,7 +40,7 @@
     .meta .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
     .meta .muted{font-size:11px}
     .audio-controls{display:flex;gap:6px;align-items:center;margin-left:auto}
-    .audio input[type="range"]{width:110px}
+    .audio input[type=\"range\"]{width:110px}
     .empty{opacity:.7;border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center}
     .diag{margin-top:8px;font-size:12px;color:#fbbf24}
     .toast{position:fixed;right:12px;bottom:70px;background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
@@ -51,68 +51,70 @@
 </head>
 <body>
   <header>
-    <div class="wrap">
-      <div class="title">World Radio — via proxy</div>
-      <div class="row" style="margin-top:10px">
-        <input id="q" type="search" placeholder="Sök station eller tagg (t.ex. 'jazz', 'bbc')" autocomplete="off" />
-        <select id="country">
-          <option value="">Alla länder</option>
+    <div class=\"wrap\">
+      <div class=\"title\">World Radio — via proxy</div>
+      <div class=\"row\" style=\"margin-top:10px\">
+        <input id=\"q\" type=\"search\" placeholder=\"Sök station eller tagg (t.ex. 'jazz', 'bbc')\" autocomplete=\"off\" />
+        <select id=\"country\">
+          <option value=\"\">Alla länder</option>
         </select>
-        <button class="btn" id="btnSearch">Sök</button>
-        <button class="btn" id="btnTop">Populärt</button>
-        <button class="btn" id="btnDiag">Diagnostik</button>
+        <button class=\"btn\" id=\"btnSearch\">Sök</button>
+        <button class=\"btn\" id=\"btnTop\">Populärt</button>
+        <button class=\"btn\" id=\"btnDiag\">Diagnostik</button>
       </div>
-      <div id="diag" class="diag" style="display:none"></div>
+      <div id=\"diag\" class=\"diag\" style=\"display:none\"></div>
     </div>
   </header>
 
-  <main class="wrap">
+  <main class=\"wrap\">
     <section>
-      <h2 class="h">Resultat</h2>
-      <div id="results" class="grid"></div>
-      <div id="resultsEmpty" class="empty" style="display:none">Inga träffar ännu — sök (ex. "BBC", "Jazz") eller tryck <em>Populärt</em>.</div>
-      <div class="more-wrap">
-        <button class="btn ghost" id="btnMore" style="display:none">Visa mer</button>
+      <h2 class=\"h\">Resultat</h2>
+      <div id=\"results\" class=\"grid\"></div>
+      <div id=\"resultsEmpty\" class=\"empty\" style=\"display:none\">Inga träffar ännu — sök (ex. \"BBC\", \"Jazz\") eller tryck <em>Populärt</em>.</div>
+      <div class=\"more-wrap\">
+        <button class=\"btn ghost\" id=\"btnMore\" style=\"display:none\">Visa mer</button>
       </div>
     </section>
 
-    <section class="nopad">
-      <h2 class="h">Favoriter</h2>
-      <div id="favs" class="grid"></div>
-      <div id="favsEmpty" class="empty">Inga favoriter än. Lägg till någon station så visas den här.</div>
+    <section class=\"nopad\">
+      <h2 class=\"h\">Favoriter</h2>
+      <div id=\"favs\" class=\"grid\"></div>
+      <div id=\"favsEmpty\" class=\"empty\">Inga favoriter än. Lägg till någon station så visas den här.</div>
     </section>
   </main>
 
-  <div class="audio" id="playerBar" style="display:none">
-    <div class="station-cover" id="playerCover" style="width:36px;height:36px;border-radius:8px"></div>
-    <div class="meta">
-      <div class="name" id="playerName">—</div>
-      <div class="muted" id="playerDetails">—</div>
+  <div class=\"audio\" id=\"playerBar\" style=\"display:none\">
+    <div class=\"station-cover\" id=\"playerCover\" style=\"width:36px;height:36px;border-radius:8px\"></div>
+    <div class=\"meta\">
+      <div class=\"name\" id=\"playerName\">—</div>
+      <div class=\"muted\" id=\"playerDetails\">—</div>
     </div>
-    <div class="audio-controls">
-      <button class="btn small" id="btnStop" title="Stoppa">⏹</button>
-      <button class="btn small" id="btnPausePlay" title="Spela/Pausa">▶</button>
-      <button class="btn small" id="btnMute" title="Ljud av/på">🔊</button>
-      <input id="vol" type="range" min="0" max="1" step="0.01" value="1" title="Volym"/>
-      <a class="btn small" id="btnHome" target="_blank" rel="noopener">Webbplats</a>
+    <div class=\"audio-controls\">
+      <button class=\"btn small\" id=\"btnStop\" title=\"Stoppa\">⏹</button>
+      <button class=\"btn small\" id=\"btnPausePlay\" title=\"Spela/Pausa\">▶</button>
+      <button class=\"btn small\" id=\"btnMute\" title=\"Ljud av/på\">🔊</button>
+      <input id=\"vol\" type=\"range\" min=\"0\" max=\"1\" step=\"0.01\" value=\"1\" title=\"Volym\"/>
+      <a class=\"btn small\" id=\"btnHome\" target=\"_blank\" rel=\"noopener\">Webbplats</a>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class=\"toast\" id=\"toast\"></div>
 
-  <audio id="audio" crossorigin="anonymous"></audio>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
+  <audio id=\"audio\" crossorigin=\"anonymous\"></audio>
+  <script src=\"https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js\" crossorigin=\"anonymous\"></script>
   <script>
-  // ======= Konfiguration: byt till din Worker-URL =======
-  const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev'; // <-- BYT UT DENNA
+  const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev';
 
-  // ======= Hjälp =======
   const $ = sel => document.querySelector(sel);
   const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
   const fmtTags = t => t ? (''+t).split(',').slice(0,3).map(s=>s.trim()).filter(Boolean) : [];
   const toast = (m)=>{ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1300); };
+  const flag = (cc)=>{
+    if(!cc || cc.length!==2) return '';
+    const A=0x1F1E6; const up=cc.toUpperCase();
+    return String.fromCodePoint(A + (up.charCodeAt(0)-65), A + (up.charCodeAt(1)-65));
+  };
 
-  // ======= API via din proxy =======
   async function api(path){
     const url = API_PROXY + '?path=' + encodeURIComponent(path);
     const r = await fetch(url);
@@ -120,7 +122,6 @@
     return await r.json();
   }
 
-  // ======= UI-kort =======
   function stationCard(st){
     const card = el('div','card');
     const cover = el('div','station-cover');
@@ -128,7 +129,9 @@
     const body = el('div');
     const name = el('div'); name.textContent = st.name || 'Okänd station';
     const meta = el('div','muted');
-    const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:''));
+    const countryTxt = st.country || st.countrycode || '';
+    const countryPart = st.countrycode ? `${flag(st.countrycode)} ${countryTxt}` : (countryTxt || '');
+    const parts=[]; if(countryPart) parts.push(countryPart); if(st.language) parts.push((''+st.language).split(',')[0]); if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:''));
     meta.textContent = parts.join(' · ');
     const tags = el('div','row'); fmtTags(st.tags).forEach(tag=>{ const p=el('span','pill'); p.textContent=tag; tags.append(p); });
     const controls = el('div','controls');
@@ -149,7 +152,10 @@
     if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else { cover.innerHTML='📻'; }
     const body = el('div');
     const name = el('div'); name.textContent = st.name || 'Okänd station'; name.style.fontWeight='600'; name.className='name';
-    const meta = el('div','muted'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
+    const meta = el('div','muted');
+    const countryTxt = st.country || st.countrycode || '';
+    const countryPart = st.countrycode ? `${flag(st.countrycode)} ${countryTxt}` : (countryTxt || '');
+    const parts=[]; if(countryPart) parts.push(countryPart); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
     const rowBtns = el('div','row');
     const btnPlay = el('button','btn small'); btnPlay.textContent='Spela'; btnPlay.addEventListener('click',()=> playStation(st));
     const btnRm = el('button','btn small'); btnRm.textContent='Ta bort'; btnRm.addEventListener('click',()=> removeFav(st.stationuuid));
@@ -158,21 +164,22 @@
     body.append(name, meta, rowBtns); card.append(cover, body); return card;
   }
 
-  // ======= Global state för Populärt (pagination 5 i taget) =======
-  const TOP_CHUNK = 5;
-  let topCache = [];    // senaste hämtade listan (array)
-  let topIndex = 0;     // nästa index att visa
-  let topKey = 'GLOBAL';// nyckel för cache (t.ex. landskod)
+  const CHUNK = 5;
+  let currentMode = 'top';
+  let topCache = []; let topIndex = 0; let topKey = 'GLOBAL';
+  let searchCache = []; let searchIndex = 0;
 
   function resetTop(key){
-    topCache = [];
-    topIndex = 0;
-    topKey = key || 'GLOBAL';
+    topCache = []; topIndex = 0; topKey = key || 'GLOBAL';
+    $('#btnMore').style.display = 'none';
+  }
+  function resetSearch(){
+    searchCache = []; searchIndex = 0;
     $('#btnMore').style.display = 'none';
   }
 
   function renderTopChunk(){
-    const end = Math.min(topIndex + TOP_CHUNK, topCache.length);
+    const end = Math.min(topIndex + CHUNK, topCache.length);
     const frag = document.createDocumentFragment();
     for(let i=topIndex;i<end;i++){ frag.append(stationCard(topCache[i])); }
     if(topIndex===0) $('#results').innerHTML='';
@@ -181,48 +188,49 @@
     topIndex = end;
     $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
   }
+  function renderSearchChunk(){
+    const end = Math.min(searchIndex + CHUNK, searchCache.length);
+    const frag = document.createDocumentFragment();
+    for(let i=searchIndex;i<end;i++){ frag.append(stationCard(searchCache[i])); }
+    if(searchIndex===0) $('#results').innerHTML='';
+    $('#results').append(frag);
+    $('#resultsEmpty').style.display = (searchCache.length===0);
+    searchIndex = end;
+    $('#btnMore').style.display = (searchIndex < searchCache.length) ? 'inline-flex' : 'none';
+  }
 
-  // ======= Sök & listor =======
   async function search(q){
+    currentMode = 'search'; resetSearch();
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none'; $('#btnMore').style.display='none';
     const query = (q||'').trim();
-    const cc = $('#country').value.trim(); // ISO2 eller tomt
-    if(!query && cc){
-      // Om bara land valt → visa Populärt i landet
-      return listTop(cc);
-    }
-    if(!query){
-      return listTop('GLOBAL');
-    }
+    const cc = $('#country').value.trim();
+    if(!query && cc){ return listTop(cc); }
+    if(!query){ return listTop('GLOBAL'); }
     const enc = encodeURIComponent(query);
     const tasks = [];
-    // Stations/search med ev. landfilter
-    let base = `/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=${enc}`;
+    let base = `/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=120&name=${enc}`;
     if(cc) base += `&countrycode=${encodeURIComponent(cc)}`;
     tasks.push(api(base));
-    // Dessa hjälper ibland att hitta mer
-    tasks.push(api(`/json/stations/byname/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
-    tasks.push(api(`/json/stations/bytag/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
+    tasks.push(api(`/json/stations/byname/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=120`));
+    tasks.push(api(`/json/stations/bytag/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=120`));
 
     const settled = await Promise.allSettled(tasks);
     const results = settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
     const seen = new Set(); const uniq = [];
     for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
-
-    if(!uniq.length){ $('#resultsEmpty').style.display='block'; return; }
-    const frag = document.createDocumentFragment(); uniq.slice(0,60).forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
+    searchCache = uniq;
+    if(!searchCache.length){ $('#resultsEmpty').style.display='block'; $('#btnMore').style.display='none'; return; }
+    renderSearchChunk();
   }
 
   async function listTop(scope){
-    // scope: 'GLOBAL' eller ISO-landskod (SE, US, ...)
+    currentMode = 'top';
     const isCountry = scope && scope !== 'GLOBAL';
     const key = isCountry ? `TOP_${scope}` : 'GLOBAL';
-
     if(topKey !== key) resetTop(key);
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
 
     if(topCache.length === 0){
-      // Hämta upp till 100 och paginera lokalt
       let list = [];
       if(isCountry){
         list = await api(`/json/stations/bycountrycodeexact/${encodeURIComponent(scope)}?hidebroken=true&order=clickcount&reverse=true&limit=100`);
@@ -231,26 +239,25 @@
       }
       topCache = Array.isArray(list) ? list : [];
     }
-    renderTopChunk(); // visar 5 första
+    renderTopChunk();
   }
 
-  // ======= Länder (dropdown) =======
   async function loadCountries(){
     try{
       const countries = await api('/json/countries?order=stationcount&reverse=true');
       const sel = $('#country');
       countries.forEach(c=>{
+        const iso = c.iso_3166_1 || c.countrycode || '';
+        const name = c.name || iso;
+        if(!iso) return;
         const opt = document.createElement('option');
-        opt.value = c.iso_3166_1 || c.countrycode || '';
-        // Fallback om iso-kod saknas
-        if(!opt.value && c.name && c.name.length===2) opt.value = c.name.toUpperCase();
-        opt.textContent = c.name + (c.stationcount ? ` (${c.stationcount})` : '');
-        if(opt.value) sel.appendChild(opt);
+        opt.value = iso;
+        opt.textContent = `${flag(iso)} ${name}${c.stationcount ? ` (${c.stationcount})` : ''}`;
+        sel.appendChild(opt);
       });
-    }catch(e){ /* ignore */ }
+    }catch(e){}
   }
 
-  // ======= Spelare =======
   const audio = $('#audio'); let hls;
   $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); });
   $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; updateButtons(); });
@@ -260,9 +267,7 @@
 
   async function playStation(st){
     let streamUrl = st.url_resolved || st.url;
-    // Hämta kanonisk URL via API
     try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{}
-    // Mixed content-fix
     if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){
       const httpsTry = streamUrl.replace(/^http:\/\//i,'https://');
       try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); streamUrl = httpsTry; }catch{}
@@ -277,13 +282,14 @@
 
     $('#playerBar').style.display='flex';
     $('#playerName').textContent = st.name || 'Okänd';
-    $('#playerDetails').textContent = [st.countrycode, st.codec ? (st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')) : null].filter(Boolean).join(' · ');
+    const countryTxt = st.country || st.countrycode || '';
+    const countryPart = st.countrycode ? `${flag(st.countrycode)} ${countryTxt}` : (countryTxt || '');
+    $('#playerDetails').textContent = [countryPart, st.codec ? (st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')) : null].filter(Boolean).join(' · ');
     const cov=$('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
     const home=$('#btnHome'); home.href = st.homepage||'#';
     updateButtons();
   }
 
-  // ======= Favoriter =======
   const favKey = 'wr_favs_v1';
   const getFavs = () => { try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
   const setFavs = (x) => localStorage.setItem(favKey, JSON.stringify(x));
@@ -306,28 +312,26 @@
     $('#favs').append(frag);
   }
 
-  // ======= Diagnostik =======
   function showDiag(msg){ const d=$('#diag'); d.style.display='block'; d.textContent=msg; }
   $('#btnDiag').addEventListener('click', async ()=>{
     try{ const stats = await api('/json/stats'); showDiag('Proxy OK · stationer: ' + (stats.stations||'?')); }
     catch(err){ showDiag('Proxy FEL: ' + err.message); }
   });
 
-  // ======= Händelser =======
   $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
   $('#btnTop').addEventListener('click', ()=> {
     const cc = $('#country').value.trim();
     listTop(cc || 'GLOBAL');
   });
-  $('#btnMore').addEventListener('click', renderTopChunk);
+  $('#btnMore').addEventListener('click', ()=>{
+    if(currentMode==='top') renderTopChunk(); else renderSearchChunk();
+  });
   $('#country').addEventListener('change', ()=>{
-    // Om vi är i Populärt-läget, ladda om top för land; annars filtra sökning
     const q = $('#q').value.trim();
     if(q) search(q); else listTop($('#country').value.trim() || 'GLOBAL');
   });
 
-  // ======= Init =======
   (async function init(){
     await loadCountries();
     try{ await listTop('GLOBAL'); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('Initfel: ' + e.message); }
