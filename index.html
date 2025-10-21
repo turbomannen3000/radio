@@ -3,10 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>World Radio — enkel webbradio</title>
-  <meta name="description" content="Lyssna på radiostationer från hela världen. Sök, spela och spara favoriter. Offline-sök fallback och Now Playing via proxy.">
-  <link rel="preconnect" href="https://de1.api.radio-browser.info" crossorigin>
-  <link rel="preconnect" href="https://nl1.api.radio-browser.info" crossorigin>
+  <title>World Radio — proxy-aktiverad</title>
+  <meta name="description" content="Lyssna på radiostationer från hela världen. Sök via egen Cloudflare Worker-proxy. Spara favoriter.">
   <style>
     :root{--bg:#0b0c10;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--border:#222433}
     *{box-sizing:border-box}
@@ -15,7 +13,6 @@
     header{position:sticky;top:0;background:rgba(11,12,16,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
     .wrap{max-width:1100px;margin:0 auto;padding:14px 12px}
     .title{display:flex;gap:8px;align-items:center;font-weight:700}
-    .title svg{opacity:.85}
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
     .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.05));border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;gap:10px;align-items:flex-start}
     .card:hover{border-color:#2a2d40}
@@ -23,14 +20,12 @@
     .station-cover img{width:100%;height:100%;object-fit:cover}
     .muted{color:var(--muted)}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    input[type="search"], input[type="url"], input[type="text"], textarea{background:#0e0f15;border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:10px;width:100%}
+    input[type="search"]{background:#0e0f15;border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:10px;width:100%}
     .controls{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px}
     .btn{background:#10121a;border:1px solid var(--border);padding:7px 10px;border-radius:10px;color:var(--text);cursor:pointer}
     .btn:hover{border-color:#2a2d40}
     .btn.primary{background:linear-gradient(180deg,#4f46e5,#4338ca);border:none}
-    .btn.ghost{background:transparent;border:1px dashed #2a2d40}
     .btn.small{padding:5px 8px;border-radius:8px}
-    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:3px 7px;border-radius:999px;font-size:12px;color:#9aa3c6}
     .h{margin:16px 0 8px;font-size:13px;color:#aab3d0;text-transform:uppercase;letter-spacing:.12em}
     .audio{position:sticky;bottom:0;background:rgba(11,12,16,.92);backdrop-filter:blur(8px);border-top:1px solid var(--border);padding:6px 10px;display:flex;gap:8px;align-items:center}
     .audio .meta{min-width:0}
@@ -38,41 +33,23 @@
     .meta .muted{font-size:11px}
     .audio-controls{display:flex;gap:6px;align-items:center;margin-left:auto}
     .audio input[type="range"]{width:110px}
-    .nopad{padding-top:2px}
-    .small{font-size:12px}
-    .now{font-size:12px;color:#b1ffd2}
     .empty{opacity:.7;border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center}
-    .link{color:#9ca3ff;text-decoration:none}
     .diag{margin-top:8px;font-size:12px;color:#fbbf24}
     .toast{position:fixed;right:12px;bottom:70px;background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
-    .hint{font-size:12px;color:#9aa3c6;margin:6px 0}
-    dialog{border:1px solid var(--border);background:#0e0f15;color:var(--text);border-radius:12px;padding:14px;max-width:560px}
-    dialog form{display:grid;gap:8px}
-    dialog::backdrop{background:rgba(0,0,0,.5)}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <div class="title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 8l14-5v3L5 11V8z" fill="currentColor"/><path d="M19 11.5a1.5 1.5 0 10-3 0v7a1.5 1.5 0 103 0v-7zM6 12h8v7H6z" fill="currentColor"/></svg>
-        <div>
-          <div>World Radio</div>
-          <div class="muted small">Sök, spela & spara favoriter</div>
-        </div>
-      </div>
+      <div class="title">World Radio — via proxy</div>
       <div class="row" style="margin-top:10px">
         <input id="q" type="search" placeholder="Sök station, land eller tagg (t.ex. 'jazz', 'Sweden', 'bbc')" />
         <button class="btn" id="btnSearch">Sök</button>
-        <button class="btn ghost" id="btnTop">Populära just nu</button>
-        <button class="btn ghost" id="btnDiag">Diagnostik</button>
-        <button class="btn ghost" id="btnAdd">+ Lägg till egen</button>
-        <button class="btn ghost" id="btnImport">Importera lista</button>
-        <button class="btn ghost" id="btnSettings">⚙ Inställningar</button>
+        <button class="btn" id="btnTop">Populära just nu</button>
+        <button class="btn" id="btnDiag">Diagnostik</button>
       </div>
       <div id="diag" class="diag" style="display:none"></div>
-      <div id="searchHint" class="hint" style="display:none">Letar online efter fler stationer…</div>
     </div>
   </header>
 
@@ -86,7 +63,7 @@
     <section class="nopad">
       <h2 class="h">Favoriter</h2>
       <div id="favs" class="grid"></div>
-      <div id="favsEmpty" class="empty">Inga favoriter än. Lägg till någon station så visas den här och uppdateras med låtinfo i realtid.</div>
+      <div id="favsEmpty" class="empty">Inga favoriter än. Lägg till någon station så visas den här.</div>
     </section>
   </main>
 
@@ -107,40 +84,11 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- Offline seedlista: ett urval kända HTTPS-stationer -->
-  <script id="seed" type="application/json">[
-    {"name":"SomaFM: Groove Salad","url":"https://ice2.somafm.com/groovesalad-128-mp3","homepage":"https://somafm.com","favicon":"https://somafm.com/favicon.ico","stationuuid":"seed-somafm-gs","tags":"ambient,chill"},
-    {"name":"SomaFM: Secret Agent","url":"https://ice2.somafm.com/secretagent-128-mp3","homepage":"https://somafm.com","favicon":"https://somafm.com/favicon.ico","stationuuid":"seed-somafm-sa","tags":"lounge,exotica"},
-    {"name":"KEXP 90.3 FM","url":"https://kexp-mp3-128.streamguys1.com/kexp128.mp3","homepage":"https://kexp.org","favicon":"https://www.kexp.org/static/favicon.ico","stationuuid":"seed-kexp","tags":"indie,alternative"},
-    {"name":"Radio Paradise (Main)","url":"https://stream.radioparadise.com/aac-192","homepage":"https://radioparadise.com","favicon":"https://radioparadise.com/favicon.ico","stationuuid":"seed-rp-main","tags":"eclectic"},
-    {"name":"Radio Swiss Pop","url":"https://stream.srg-ssr.ch/m/rsp/mp3_128","homepage":"https://www.radioswisspop.ch","favicon":"https://www.radioswisspop.ch/favicon-32x32.png","stationuuid":"seed-rsp","tags":"pop,swiss"},
-    {"name":"Radio Swiss Jazz","url":"https://stream.srg-ssr.ch/m/rsj/mp3_128","homepage":"https://www.radioswissjazz.ch","favicon":"https://www.radioswissjazz.ch/favicon-32x32.png","stationuuid":"seed-rsj","tags":"jazz"},
-    {"name":"BBC World Service","url":"https://stream.live.vc.bbcmedia.co.uk/bbc_world_service","homepage":"https://www.bbc.co.uk/sounds","favicon":"https://www.bbc.co.uk/favicon.ico","stationuuid":"seed-bbc-ws","tags":"news,world"},
-    {"name":"NRK P3","url":"https://lyd.nrk.no/nrk_radio_p3_mp3_h","homepage":"https://radio.nrk.no","favicon":"https://www.nrk.no/apple-touch-icon.png","stationuuid":"seed-nrk-p3","tags":"pop,norway"},
-    {"name":"YleX","url":"https://yleradiolive.akamaized.net/hls/live/2027675/yleradiox/master.m3u8","homepage":"https://yle.fi","favicon":"https://yle.fi/favicon.ico","stationuuid":"seed-ylex","tags":"pop,finland","hls":1},
-    {"name":"SR P3 (Sweden)","url":"https://http-live.sr.se/p3-mp3-192","homepage":"https://sverigesradio.se","favicon":"https://sverigesradio.se/favicon.ico","stationuuid":"seed-sr-p3","tags":"sweden,pop"},
-    {"name":"SR P1 (Sweden)","url":"https://http-live.sr.se/p1-mp3-192","homepage":"https://sverigesradio.se","favicon":"https://sverigesradio.se/favicon.ico","stationuuid":"seed-sr-p1","tags":"sweden,news"},
-    {"name":"SR P2 (Sweden)","url":"https://http-live.sr.se/p2-mp3-192","homepage":"https://sverigesradio.se","favicon":"https://sverigesradio.se/favicon.ico","stationuuid":"seed-sr-p2","tags":"sweden,classical"},
-    {"name":"WQXR Classical","url":"https://stream.wqxr.org/wqxr-web.aac","homepage":"https://www.wqxr.org","favicon":"https://www.wqxr.org/static/img/favicon.ico","stationuuid":"seed-wqxr","tags":"classical"},
-    {"name":"FIP","url":"https://direct.fipradio.fr/live/fip-midfi.mp3","homepage":"https://www.fip.fr","favicon":"https://www.radiofrance.fr/themes/custom/radiofrance/dist/assets/icons/apple-touch-icon.png","stationuuid":"seed-fip","tags":"eclectic,france"},
-    {"name":"NAXI Lounge","url":"https://naxidigital-lounge128ssl.streaming.rs:8030/;","homepage":"https://www.naxi.rs","favicon":"https://www.naxi.rs/favicon.ico","stationuuid":"seed-naxi-lounge","tags":"lounge"},
-    {"name":"ABC Jazz","url":"https://live-radio01.mediahubaustralia.com/JAZW/mp3/","homepage":"https://abc.net.au","favicon":"https://www.abc.net.au/favicon.ico","stationuuid":"seed-abc-jazz","tags":"jazz,australia"},
-    {"name":"NPR News","url":"https://npr-ice.streamguys1.com/live.mp3","homepage":"https://npr.org","favicon":"https://www.npr.org/favicon.ico","stationuuid":"seed-npr","tags":"news,usa"}
-  ]</script>
-
   <audio id="audio" crossorigin="anonymous"></audio>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
-  // ======= Konfiguration =======
-  let NOWPLAYING_PROXY = localStorage.getItem('wr_now_proxy') || '';
-  const RB_BOOTSTRAP = [
-    'https://de1.api.radio-browser.info',
-    'https://nl1.api.radio-browser.info',
-    'https://fr1.api.radio-browser.info',
-    'https://us1.api.radio-browser.info',
-  ];
-  let RB = null; // vald server
-  const AOF = 'https://api.allorigins.win/raw?url='; // CORS-fallback
+  // ======= Konfiguration: sätt din Worker-URL här =======
+  const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev'; // <-- BYT UT DENNA
 
   // ======= Hjälp =======
   const $ = sel => document.querySelector(sel);
@@ -148,49 +96,28 @@
   const fmtTags = t => t ? (''+t).split(',').slice(0,3).map(s=>s.trim()).filter(Boolean) : [];
   const toast = (m)=>{ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1300); };
 
-  // ======= Lokal datakälla (offline) =======
-  let LOCAL = []; try { LOCAL = JSON.parse(document.getElementById('seed').textContent || '[]'); } catch {}
-
-  // ======= Favoriter =======
-  const favKey = 'worldradio_favs_v7';
-  function getFavs(){ try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } }
-  function setFavs(list){ localStorage.setItem(favKey, JSON.stringify(list)); }
-  function isFav(uuid){ return getFavs().some(f=> f.uuid===uuid); }
-
-  // ======= JSON fetch med CORS fallback =======
-  async function fetchJSON(url){
-    try{ const r = await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
-    catch(err){ const r2 = await fetch(AOF + encodeURIComponent(url)); if(!r2.ok) throw new Error('HTTP '+r2.status+' via proxy'); return await r2.json(); }
-  }
-
-  async function pickServer(){
-    for(const base of RB_BOOTSTRAP){ try{ const s = await fetchJSON(base + '/json/stats'); if(s && (s.stations||s.tags)){ RB = base; return; } }catch{} }
-    for(const seed of RB_BOOTSTRAP){
-      try{ const servers = await fetchJSON(seed + '/json/servers');
-        for(const srv of servers){ const base='https://'+srv.name; try{ const s = await fetchJSON(base + '/json/stats'); if(s && (s.stations||s.tags)){ RB = base; return; } }catch{} }
-      }catch{}
-    }
-    RB = null; // inget online
-  }
-
+  // ======= API via din proxy =======
   async function api(path){
-    if(!RB) await pickServer(); if(!RB) throw new Error('Ingen onlineserver'); return await fetchJSON(RB + path);
+    const url = API_PROXY + '?path=' + encodeURIComponent(path);
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('API ' + r.status);
+    return await r.json();
   }
 
-  // ======= UI builders =======
+  // ======= UI-kort =======
   function stationCard(st){
     const card = el('div','card');
     const cover = el('div','station-cover');
     if(st.favicon){ const img=new Image(); img.src=st.favicon; img.alt=''; cover.append(img);} else { cover.innerHTML='📻'; }
     const body = el('div');
     const name = el('div'); name.textContent = st.name || 'Okänd station';
-    const meta = el('div','muted small');
+    const meta = el('div','muted');
     const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:''));
     meta.textContent = parts.join(' · ');
     const tags = el('div','row'); fmtTags(st.tags).forEach(tag=>{ const p=el('span','pill'); p.textContent=tag; tags.append(p); });
     const controls = el('div','controls');
     const btnPlay = el('button','btn primary'); btnPlay.textContent='Spela';
-    const btnFav = el('button','btn'); btnFav.textContent = isFav(st.stationuuid||st.name) ? '★ Sparad' : '☆ Favorit';
+    const btnFav = el('button','btn'); btnFav.textContent = isFav(st.stationuuid) ? '★ Sparad' : '☆ Favorit';
     const btnHome = el('a','btn'); btnHome.textContent='Webbplats'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
     btnPlay.addEventListener('click', ()=> playStation(st));
     btnFav.addEventListener('click', ()=> toggleFav(st, btnFav));
@@ -201,93 +128,47 @@
   }
 
   function favCard(st){
-    const card = el('div','card'); card.dataset.uuid = st.stationuuid||st.name;
+    const card = el('div','card'); card.dataset.uuid = st.stationuuid;
     const cover = el('div','station-cover'); cover.style.width='40px'; cover.style.height='40px'; cover.style.borderRadius='9px';
     if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else { cover.innerHTML='📻'; }
     const body = el('div');
     const name = el('div'); name.textContent = st.name || 'Okänd station'; name.style.fontWeight='600'; name.className='name';
-    const now = el('div','now'); now.textContent='—'; now.dataset.role='now';
-    const meta = el('div','muted small'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
+    const meta = el('div','muted'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
     const rowBtns = el('div','row');
     const btnPlay = el('button','btn small'); btnPlay.textContent='Spela'; btnPlay.addEventListener('click',()=> playStation(st));
-    const btnRm = el('button','btn small'); btnRm.textContent='Ta bort'; btnRm.addEventListener('click',()=> removeFav(st.stationuuid||st.name));
+    const btnRm = el('button','btn small'); btnRm.textContent='Ta bort'; btnRm.addEventListener('click',()=> removeFav(st.stationuuid));
     const btnHome = el('a','btn small'); btnHome.textContent='Webbplats'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
     rowBtns.append(btnPlay, btnRm, btnHome);
-    body.append(name, now, meta, rowBtns); card.append(cover, body); return card;
+    body.append(name, meta, rowBtns); card.append(cover, body); return card;
   }
 
-  // ======= Sök (inkrementell: lokal → online) =======
-  function localSearch(q){
-    const s = (q||'').toLowerCase();
-    return LOCAL.filter(st=>{
-      const hay = [st.name, st.tags, st.countrycode, st.language].filter(Boolean).join(' ').toLowerCase();
-      return hay.includes(s);
-    });
-  }
-
-  function renderResults(arr){
-    const frag = document.createDocumentFragment();
-    arr.forEach(st=> frag.append(stationCard(st)));
-    $('#results').innerHTML='';
-    $('#results').append(frag);
-    $('#resultsEmpty').style.display = arr.length? 'none':'block';
-  }
-
-  function mergeAndRender(current, extra){
-    const seen=new Set(); const out=[];
-    [...current, ...extra].forEach(st=>{ const id=st.stationuuid||st.name; if(!seen.has(id)){ seen.add(id); out.push(st); } });
-    renderResults(out.slice(0,36));
-    return out;
-  }
-
+  // ======= Sök & listor =======
   async function search(q){
-    const query=(q||'').trim();
-    const local = localSearch(query);
-    renderResults(local);
-    $('#searchHint').style.display='block';
-
-    // Välj server en gång först (så inte timeout slå in i onödigt)
-    await pickServer();
-    if(!RB){ // inget online
-      $('#searchHint').textContent = 'Offline-läge: visar lokala resultat.';
-      return;
-    }
-
+    $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
+    const enc = encodeURIComponent(q.trim());
     const tasks = [];
-    if(/^[A-Za-z]{2}$/.test(query)) tasks.push(api('/json/stations/bycountrycodeexact/'+encodeURIComponent(query.toUpperCase())+'?hidebroken=true&order=clickcount&reverse=true&limit=60'));
-    if(query){
-      const enc = encodeURIComponent(query);
-      tasks.push(api('/json/stations/byname/'+enc+'?hidebroken=true&order=clickcount&reverse=true&limit=60'));
-      tasks.push(api('/json/stations/bytag/'+enc+'?hidebroken=true&order=clickcount&reverse=true&limit=60'));
-      tasks.push(api('/json/stations/bycountry/'+enc+'?hidebroken=true&order=clickcount&reverse=true&limit=60'));
-      tasks.push(api('/json/stations/bylanguage/'+enc+'?hidebroken=true&order=clickcount&reverse=true&limit=60'));
-      tasks.push(api('/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name='+enc));
-      tasks.push(api('/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&tag='+enc));
-      tasks.push(api('/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&language='+enc));
-    }
-    if(!tasks.length){ $('#searchHint').style.display='none'; return listTop(); }
+    if(!q){ return listTop(); }
+    // Kör flera varianter parallellt
+    tasks.push(api('/json/stations/byname/' + enc + '?hidebroken=true&order=clickcount&reverse=true&limit=60'));
+    tasks.push(api('/json/stations/bytag/' + enc + '?hidebroken=true&order=clickcount&reverse=true&limit=60'));
+    tasks.push(api('/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=' + enc));
 
-    let merged = local;
-    try{
-      const settled = await Promise.allSettled(tasks);
-      const online = settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
-      merged = mergeAndRender(local, online);
-      $('#searchHint').textContent = `Sökresultat: ${merged.length} (online + offline)`;
-    }catch(err){
-      $('#searchHint').textContent = 'Online-sök misslyckades. Visar lokala resultat.';
-    }
+    const settled = await Promise.allSettled(tasks);
+    const results = settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
+    const seen = new Set(); const uniq = [];
+    for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
+    if(!uniq.length){ $('#resultsEmpty').style.display='block'; return; }
+    const frag = document.createDocumentFragment(); uniq.slice(0,60).forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
   }
 
-  // ======= Topplista (online eller seed) =======
   async function listTop(){
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
-    try{ const list = await api('/json/stations/topclick?limit=36&hidebroken=true'); if(list?.length){ renderResults(list); $('#searchHint').style.display='none'; return; } }catch{}
-    renderResults(LOCAL.slice(0,24)); // fallback
-    $('#searchHint').style.display='none';
+    const list = await api('/json/stations/topclick?limit=36&hidebroken=true');
+    const frag = document.createDocumentFragment(); list.forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
   }
 
   // ======= Spelare =======
-  const audio = $('#audio'); let hls; let currentStation=null;
+  const audio = $('#audio'); let hls;
   $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); });
   $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; updateButtons(); });
   $('#btnMute').addEventListener('click',()=>{ audio.muted = !audio.muted; updateButtons(); });
@@ -295,50 +176,69 @@
   function updateButtons(){ $('#btnPausePlay').textContent = audio.paused ? '▶' : '⏸'; $('#btnMute').textContent = audio.muted ? '🔇' : '🔊'; }
 
   async function playStation(st){
-    currentStation = st; let streamUrl = st.url_resolved || st.url;
-    if(st.stationuuid && !(''+st.stationuuid).startsWith('seed-')){ try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{} }
-    const isHls = /\.m3u8($|\?)/i.test(streamUrl) || st.hls === 1;
-    if(hls){ hls.destroy(); hls=null; } audio.src='';
-    if(isHls && window.Hls?.isSupported()){ hls = new Hls({maxBufferLength:20}); hls.loadSource(streamUrl); hls.attachMedia(audio); }
-    else { audio.src = streamUrl; }
+    let streamUrl = st.url_resolved || st.url;
+    // Hämta kanonisk URL via API
+    try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{}
+    // Mixed content-fix: försök https om sidan är https och länken är http
+    if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){
+      const httpsTry = streamUrl.replace(/^http:\/\//i,'https://');
+      try{ const head = await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); streamUrl = httpsTry; }catch{}
+    }
+
+    const isHls = /\.m3u8($|\?)/i.test(streamUrl);
+    if(hls){ hls.destroy(); hls=null; }
+    audio.src = '';
+    if(isHls && window.Hls?.isSupported()){
+      hls = new Hls({maxBufferLength:20}); hls.loadSource(streamUrl); hls.attachMedia(audio);
+    } else { audio.src = streamUrl; }
     audio.play();
-    $('#playerBar').style.display='flex'; $('#playerName').textContent = st.name || 'Okänd'; $('#playerDetails').textContent = [st.countrycode, st.codec?(st.codec+(st.bitrate?` ${st.bitrate}kbps`:'')):null].filter(Boolean).join(' · ');
-    $('#btnHome').href = st.homepage || '#'; const cov=$('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
+
+    $('#playerBar').style.display='flex';
+    $('#playerName').textContent = st.name || 'Okänd';
+    $('#playerDetails').textContent = [st.countrycode, st.codec ? (st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')) : null].filter(Boolean).join(' · ');
+    const cov=$('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
+    const home=$('#btnHome'); home.href = st.homepage||'#';
     updateButtons();
   }
 
   // ======= Favoriter =======
-  function buildSnapshot(st){ return { stationuuid: st.stationuuid||st.name, name: st.name, url: st.url, url_resolved: st.url_resolved, homepage: st.homepage, favicon: st.favicon, codec: st.codec, bitrate: st.bitrate, hls: st.hls, countrycode: st.countrycode, language: st.language, tags: st.tags }; }
-  function toggleFav(st, btn){ const uuid=st.stationuuid||st.name; let favs=getFavs(); const i=favs.findIndex(f=> f.uuid===uuid); if(i>=0){ favs.splice(i,1); setFavs(favs); btn.textContent='☆ Favorit'; toast('Borttagen från favoriter'); refreshFavs(); return; } const snap=buildSnapshot(st); favs.push({uuid:snap.stationuuid, snap}); setFavs(favs); btn.textContent='★ Sparad'; toast('Tillagd i favoriter'); refreshFavs(); }
-  function removeFav(uuid){ const favs=getFavs().filter(f=> f.uuid!==uuid); setFavs(favs); refreshFavs(); }
-  async function refreshFavs(){ const favs=getFavs(); $('#favs').innerHTML=''; $('#favsEmpty').style.display=favs.length?'none':'block'; if(!favs.length) return; const uuids=favs.map(f=> f.uuid).filter(u=> !(''+u).startsWith('seed-')); let byUuid=[]; if(uuids.length){ try{ byUuid=await api('/json/stations/byuuid?uuids='+encodeURIComponent(uuids.join(','))); }catch{} } const map=new Map(byUuid.map(s=>[s.stationuuid,s])); const frag=document.createDocumentFragment(); favs.forEach(f=>{ const s=map.get(f.uuid)||f.snap; if(!s) return; frag.append(favCard(s)); }); $('#favs').append(frag); scheduleNowPlayingUpdate(); }
-
-  // ======= Now Playing (proxy) =======
-  let npTimer; function scheduleNowPlayingUpdate(){ clearInterval(npTimer); if(!NOWPLAYING_PROXY){ document.querySelectorAll('[data-role="now"]').forEach(n=> n.textContent = 'Saknas: ställ in proxy under Inställningar'); return; } const tick = async ()=>{ const cards=Array.from($('#favs').children); await Promise.all(cards.map(async card=>{ const uuid=card.dataset.uuid; try{ let streamUrl=null; if(uuid && !(''+uuid).startsWith('seed-')){ const info=await api('/json/url/'+encodeURIComponent(uuid)); streamUrl=info?.url; } if(!streamUrl) return; const r=await fetch(NOWPLAYING_PROXY+'?stream='+encodeURIComponent(streamUrl)); if(!r.ok) return; const data=await r.json(); const txt = data && (data.title||data.now||data.streamTitle) ? (data.artist? (data.artist+' – '+(data.title||'')) : (data.title||data.now||data.streamTitle)) : '—'; const elNow=card.querySelector('[data-role="now"]'); elNow.textContent=txt||'—'; }catch{} })); }; tick(); npTimer=setInterval(tick,15000); }
-
-  // ======= Dialoger: Lägg till egen, Importera, Inställningar =======
-  const dlAdd = document.createElement('dialog'); dlAdd.innerHTML=`<form method="dialog"><h3>Lägg till egen station</h3><input id="addName" type="text" placeholder="Namn" required><input id="addUrl" type="url" placeholder="Stream-URL (http/s, mp3/aac/m3u8)" required><input id="addHome" type="url" placeholder="Webbplats (valfritt)"><div class="row"><button class="btn" value="cancel">Avbryt</button><button class="btn primary" value="ok">Spara</button></div></form>`; document.body.append(dlAdd);
-  $('#btnAdd').addEventListener('click',()=> dlAdd.showModal()); dlAdd.addEventListener('close',()=>{ if(dlAdd.returnValue==='ok'){ const n=dlAdd.querySelector('#addName').value.trim(); const u=dlAdd.querySelector('#addUrl').value.trim(); const h=dlAdd.querySelector('#addHome').value.trim(); if(n && u){ const st={ name:n, url:u, homepage:h||'', favicon:'', stationuuid:'seed-'+Math.random().toString(36).slice(2), tags:'' }; LOCAL.unshift(st); toast('Station tillagd'); search(n); } } });
-
-  const dlImp = document.createElement('dialog'); dlImp.innerHTML=`<form method="dialog"><h3>Importera lista</h3><p class="muted small">Klistra in JSON (Radio Browser / stationsarray) eller en URL till JSON</p><textarea id="impText" style="width:100%;height:140px"></textarea><div class="row"><button class="btn" id="btnImpUrl">Hämta URL</button><span style="flex:1"></span><button class="btn" value="cancel">Stäng</button><button class="btn primary" id="btnImpApply">Lägg till</button></div></form>`; document.body.append(dlImp);
-  $('#btnImport').addEventListener('click',()=> dlImp.showModal());
-  dlImp.querySelector('#btnImpUrl').addEventListener('click', async (e)=>{ e.preventDefault(); const val=dlImp.querySelector('#impText').value.trim(); if(!val) return; try{ const data = await fetchJSON(val); dlImp.querySelector('#impText').value = JSON.stringify(data,null,2); }catch(err){ toast('Kunde inte hämta URL'); } });
-  dlImp.querySelector('#btnImpApply').addEventListener('click',(e)=>{ e.preventDefault(); try{ const arr=JSON.parse(dlImp.querySelector('#impText').value||'[]'); if(Array.isArray(arr)){ const added=[]; arr.forEach(st=>{ if(st && (st.url||st.url_resolved) && st.name){ LOCAL.push({ name:st.name, url:st.url||st.url_resolved, homepage:st.homepage||'', favicon:st.favicon||'', stationuuid: st.stationuuid||('seed-'+Math.random().toString(36).slice(2)), tags: st.tags||'' }); added.push(st.name); } }); toast('Importerade '+added.length+' stationer'); dlImp.close('ok'); search(''); } }catch{ toast('Ogiltig JSON'); } });
-
-  const dlSet = document.createElement('dialog'); dlSet.innerHTML=`<form method="dialog"><h3>Inställningar</h3><label class="small muted">Now Playing proxy-URL (Cloudflare Worker)</label><input id="setNP" type="url" placeholder="https://din-worker.exempel/now" value="${NOWPLAYING_PROXY}"><div class="row"><button class="btn" value="cancel">Stäng</button><button class="btn primary" value="ok">Spara</button></div></form>`; document.body.append(dlSet);
-  $('#btnSettings').addEventListener('click',()=> dlSet.showModal()); dlSet.addEventListener('close',()=>{ if(dlSet.returnValue==='ok'){ const v=dlSet.querySelector('#setNP').value.trim(); NOWPLAYING_PROXY = v; localStorage.setItem('wr_now_proxy', v||''); scheduleNowPlayingUpdate(); toast('Inställningar sparade'); } });
+  const favKey = 'wr_favs_v1';
+  const getFavs = () => { try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
+  const setFavs = (x) => localStorage.setItem(favKey, JSON.stringify(x));
+  const isFav = (uuid) => getFavs().some(f=> f.uuid===uuid);
+  function toggleFav(st, btn){
+    const favs = getFavs();
+    const i = favs.findIndex(f=> f.uuid===st.stationuuid);
+    if(i>=0){ favs.splice(i,1); setFavs(favs); btn.textContent='☆ Favorit'; toast('Borttagen från favoriter'); refreshFavs(); return; }
+    favs.push({uuid: st.stationuuid, snap: st}); setFavs(favs); btn.textContent='★ Sparad'; toast('Tillagd i favoriter'); refreshFavs();
+  }
+  function removeFav(uuid){ const favs = getFavs().filter(f=> f.uuid!==uuid); setFavs(favs); refreshFavs(); }
+  async function refreshFavs(){
+    const favs = getFavs();
+    $('#favs').innerHTML=''; $('#favsEmpty').style.display = favs.length ? 'none' : 'block'; if(!favs.length) return;
+    // Försök hämta uppdaterad metadata, annars snapshot
+    const uuids = favs.map(f=> f.uuid).join(',');
+    let updated=[]; try{ updated = await api('/json/stations/byuuid?uuids=' + encodeURIComponent(uuids)); }catch{}
+    const map = new Map(updated.map(s=> [s.stationuuid, s]));
+    const frag = document.createDocumentFragment();
+    favs.forEach(f=>{ const s = map.get(f.uuid) || f.snap; if(!s) return; frag.append(favCard(s)); });
+    $('#favs').append(frag);
+  }
 
   // ======= Diagnostik =======
   function showDiag(msg){ const d=$('#diag'); d.style.display='block'; d.textContent=msg; }
-  $('#btnDiag').addEventListener('click', async ()=>{ await pickServer(); if(RB){ try{ const stats = await api('/json/stats'); showDiag('Server: '+RB+' — stationer: '+(stats.stations||'?')); }catch{ showDiag('Server: '+RB+' (stats misslyckades)'); } } else { showDiag('Offline-läge: använder seed-lista'); } });
+  $('#btnDiag').addEventListener('click', async ()=>{
+    try{ const stats = await api('/json/stats'); showDiag('Proxy OK · stationer: ' + (stats.stations||'?')); }
+    catch(err){ showDiag('Proxy FEL: ' + err.message); }
+  });
 
   // ======= Händelser =======
-  $('#btnSearch').addEventListener('click', ()=> { const v=$('#q').value.trim(); search(v); });
+  $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
   $('#btnTop').addEventListener('click', listTop);
 
   // ======= Init =======
-  (async function init(){ try{ await listTop(); }catch{ renderResults(LOCAL.slice(0,24)); } refreshFavs(); })();
+  (async function init(){ try{ await listTop(); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('Initfel: ' + e.message); } refreshFavs(); })();
   </script>
 </body>
 </html>
