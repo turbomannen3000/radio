@@ -5,20 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>World Radio</title>
   <meta name="description" content="Lyssna på radiostationer från hela världen. Sök via egen Cloudflare Worker-proxy. Spara favoriter.">
-  <!-- Digital/retro font -->
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
     :root{
       --bg:#000;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--border:#222433;
-      --green:#b1ffd2; --player-h: 110px; --ticker-h: 34px;
+      --green:#b1ffd2; --player-h: 150px; --ticker-h: 34px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     html{ -webkit-text-size-adjust: 100%; }
     body{
       margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);
-      background:#000;
-      touch-action: manipulation;
+      background:#000; touch-action: manipulation;
       padding-bottom: calc(var(--ticker-h) + var(--player-h) + env(safe-area-inset-bottom) + 20px);
     }
     header{position:sticky;top:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
@@ -38,7 +36,7 @@
     .pill{font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
     .controls{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px}
 
-    /* DIGITAL STIL */
+    /* Digital stil */
     .digital{ font-family:'VT323',ui-monospace,Consolas,monospace; letter-spacing:.03em; color:var(--green); text-shadow:0 0 6px rgba(177,255,210,.45); }
     .btn{
       background:#0c0e13;border:1px solid #2a2d40;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:18px;
@@ -56,7 +54,6 @@
     .toast{position:fixed;right:12px;bottom:calc(var(--ticker-h) + var(--player-h) + env(safe-area-inset-bottom) + 12px);background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
 
-    /* "Visa mer" – bara längst ned */
     .more-wrap{display:flex;justify-content:center;margin:16px 0 24px}
 
     /* Ticker */
@@ -69,23 +66,27 @@
     .tickerInner .digital{ font-size:22px;line-height:1;display:inline-block;padding-left:100%; animation:ticker 20s linear infinite; }
     @keyframes ticker{ from{ transform:translateX(0);} to{ transform:translateX(-100%);} }
 
-    /* Spelare */
+    /* Spelare – högre + alltid tight mot botten */
     .audio{
       position:fixed;left:0;right:0;bottom:0;
       height:calc(var(--player-h) + env(safe-area-inset-bottom));
       background:#000; border-top:1px solid var(--border);
-      display:flex;gap:12px;align-items:center;padding:10px 12px;
-      padding-bottom:calc(10px + env(safe-area-inset-bottom));
+      display:flex;gap:12px;align-items:center;padding:12px;
+      padding-bottom:calc(12px + env(safe-area-inset-bottom));
       z-index:21;
     }
-    .audio .station-cover{width:64px;height:64px;border-radius:14px}
-    .audio .meta{min-width:0;display:flex;flex-direction:column;gap:4px}
-    .meta .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:18px;font-weight:700}
-    .meta .muted{font-size:12px}
+    .audio .station-cover{width:72px;height:72px;border-radius:14px}
+    .audio .meta{min-width:0;display:flex;flex-direction:column;gap:6px;flex:1}
+    .meta .name{font-size:22px}
+    /* Två rader för namnet så det syns tydligare */
+    .meta .name span#playerName{
+      display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:normal;
+    }
+    .meta .muted{font-size:13px}
     .liveDot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 12px rgba(239,68,68,.8);margin-right:6px;display:inline-block;vertical-align:middle}
-    .audio-controls{display:flex;gap:8px;align-items:center;margin-left:auto}
+    .audio-controls{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
 
-    /* SVG-ikoner i digital stil */
+    /* SVG-ikoner */
     .ico{width:20px;height:20px; display:block; stroke:var(--green); fill:none; stroke-width:1.9;
          filter:drop-shadow(0 0 6px rgba(177,255,210,.45));}
     .ico-fill{ fill:var(--green); stroke:none; filter:drop-shadow(0 0 6px rgba(177,255,210,.45)); }
@@ -103,12 +104,25 @@
       writing-mode: bt-lr; -webkit-appearance: slider-vertical; appearance: slider-vertical;
       background:transparent;
     }
-    /* WebKit styling för “digitalt” spår/tumme */
     .vol-slider::-webkit-slider-runnable-track{ background:linear-gradient(180deg,#0c1320,#0a0f18); border:1px solid #2a2d40; width:6px; border-radius:999px; }
     .vol-slider::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
       background:var(--green); box-shadow:0 0 10px rgba(177,255,210,.55); margin-top:-6px; }
     .vol-slider::-moz-range-track{ background:#0c1320; border:1px solid #2a2d40; }
     .vol-slider::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--green); box-shadow:0 0 10px rgba(177,255,210,.55); }
+
+    /* Mobil: dela upp i två rader – kontroller under texten */
+    @media (max-width: 720px){
+      .audio{
+        display:grid;
+        grid-template-columns: 80px 1fr;
+        grid-template-rows: auto auto;
+        align-items:start;
+        gap:10px 12px;
+      }
+      #playerCover{ grid-row: 1 / span 2; }
+      .audio .meta{ grid-column: 2; grid-row: 1; }
+      .audio-controls{ grid-column: 1 / -1; grid-row: 2; margin-left:0; justify-content:space-between; }
+    }
 
     /* Favoriter-vy */
     body.mode-favs #resultsSection{display:none}
@@ -116,7 +130,7 @@
   </style>
 </head>
 <body>
-  <!-- SVG SPRITE (ikoner) -->
+  <!-- SVG-sprite -->
   <svg width="0" height="0" style="position:absolute;left:-9999px;top:-9999px">
     <defs>
       <symbol id="ico-play" viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"></polygon></symbol>
@@ -181,7 +195,7 @@
   <div class="audio" id="playerBar" style="display:none">
     <div class="station-cover" id="playerCover"></div>
     <div class="meta">
-      <div class="name digital" style="font-size:22px"><span class="liveDot" id="liveDot" style="display:none"></span><span id="playerName">—</span></div>
+      <div class="name digital"><span class="liveDot" id="liveDot" style="display:none"></span><span id="playerName">—</span></div>
       <div class="muted digital" id="playerDetails">—</div>
     </div>
     <div class="audio-controls">
@@ -194,8 +208,6 @@
       <button class="btn small iconbtn" id="btnMute" title="Ljud av/på" aria-label="Ljud av/på">
         <svg class="ico" id="icoMute"><use href="#ico-volume"/></svg>
       </button>
-
-      <!-- Volymknapp + vertikal popover -->
       <div class="vol-wrap">
         <button class="btn small iconbtn" id="btnVol" title="Volym" aria-haspopup="true" aria-expanded="false">
           <svg class="ico"><use href="#ico-volume"/></svg>
@@ -204,8 +216,6 @@
           <input id="volSlider" class="vol-slider" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volym (vertikal)"/>
         </div>
       </div>
-
-      <!-- Jordglob -->
       <a class="btn small iconbtn" id="btnHome" target="_blank" rel="noopener" title="Öppna stationens webbplats" aria-label="Öppna stationens webbplats">
         <svg class="ico"><use href="#ico-globe"/></svg>
       </a>
@@ -217,341 +227,188 @@
   <audio id="audio" crossorigin="anonymous" playsinline></audio>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
-  // ======= KONFIG =======
   const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev';
-
-  // ======= Hjälp =======
   const $ = sel => document.querySelector(sel);
   const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
   const fmtTags = t => t ? (''+t).split(',').slice(0,3).map(s=>s.trim()).filter(Boolean) : [];
   const toast = (m)=>{ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1300); };
 
-  // ======= API via proxy =======
-  async function api(path){
-    const url = API_PROXY + '?path=' + encodeURIComponent(path);
-    const r = await fetch(url);
-    if(!r.ok) throw new Error('API ' + r.status);
-    return await r.json();
-  }
-  async function now(streamUrl){
-    try{
-      const r = await fetch(API_PROXY + '?now=1&stream=' + encodeURIComponent(streamUrl));
-      if(!r.ok) throw 0; return await r.json();
-    }catch{ return null; }
-  }
+  async function api(path){ const r=await fetch(API_PROXY+'?path='+encodeURIComponent(path)); if(!r.ok) throw new Error('API '+r.status); return r.json(); }
+  async function now(streamUrl){ try{ const r=await fetch(API_PROXY+'?now=1&stream='+encodeURIComponent(streamUrl)); if(!r.ok) throw 0; return r.json(); }catch{ return null; } }
 
-  // ======= Ticker =======
   function setTicker(text){
-    const span = $('#tickerText');
-    const msg = (text || '').trim() || '—';
-    span.textContent = '   ' + msg + '   ';
-    span.style.animation = 'none'; // restart animation
-    void span.offsetWidth; // reflow
-    span.style.animation = '';
-    $('#ticker').style.display = 'flex';
+    const span=$('#tickerText'); const msg=(text||'').trim()||'—';
+    span.textContent='   '+msg+'   '; span.style.animation='none'; void span.offsetWidth; span.style.animation=''; $('#ticker').style.display='flex';
   }
   function hideTicker(){ $('#ticker').style.display='none'; }
 
-  // ======= Kort =======
   function stationCard(st){
-    const card = el('div','card');
-    const cover = el('div','station-cover');
-    if(st.favicon){ const img=new Image(); img.src=st.favicon; img.alt=''; cover.append(img);} else { cover.innerHTML='📻'; }
-    const body = el('div');
-
-    const name = el('div','digital'); name.style.fontSize='20px'; name.textContent = st.name || 'Okänd station';
-    const meta = el('div','muted digital'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')); 
-    meta.textContent = parts.join(' · ');
-
-    const tags = el('div','row'); fmtTags(st.tags).forEach(tag=>{ const p=el('span','pill digital'); p.textContent=tag; tags.append(p); });
-
-    const controls = el('div','controls');
-    const btnPlay = el('button','btn primary digital'); btnPlay.textContent='SPELA';
-    const btnFav = el('button','btn digital'); btnFav.textContent = isFav(st.stationuuid) ? '★ SPARAD' : '☆ FAVORIT';
-    const btnHome = el('a','btn iconbtn'); btnHome.title='Öppna stationens webbplats'; btnHome.setAttribute('aria-label','Öppna stationens webbplats'); btnHome.innerHTML='<svg class="ico"><use href="#ico-globe"/></svg>'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
-
-    btnPlay.addEventListener('click', ()=> playStation(st));
-    btnFav.addEventListener('click', ()=> toggleFav(st, btnFav));
-
-    controls.append(btnPlay, btnFav, btnHome);
-    body.append(name, meta, tags, controls);
-    card.append(cover, body);
-    return card;
+    const card=el('div','card');
+    const cover=el('div','station-cover'); if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else cover.innerHTML='📻';
+    const body=el('div');
+    const name=el('div','digital'); name.style.fontSize='20px'; name.textContent=st.name||'Okänd station';
+    const meta=el('div','muted digital'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); if(st.codec) parts.push(st.codec+(st.bitrate?` ${st.bitrate}kbps`:'')); meta.textContent=parts.join(' · ');
+    const tags=el('div','row'); fmtTags(st.tags).forEach(tag=>{ const p=el('span','pill digital'); p.textContent=tag; tags.append(p); });
+    const controls=el('div','controls');
+    const btnPlay=el('button','btn primary digital'); btnPlay.textContent='SPELA';
+    const btnFav=el('button','btn digital'); btnFav.textContent=isFav(st.stationuuid)?'★ SPARAD':'☆ FAVORIT';
+    const btnHome=el('a','btn iconbtn'); btnHome.innerHTML='<svg class="ico"><use href="#ico-globe"/></svg>'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
+    btnPlay.addEventListener('click',()=>playStation(st));
+    btnFav.addEventListener('click',()=>toggleFav(st,btnFav));
+    controls.append(btnPlay,btnFav,btnHome);
+    body.append(name,meta,tags,controls); card.append(cover,body); return card;
   }
 
   function favCard(st){
-    const card = el('div','card'); card.dataset.uuid = st.stationuuid;
-    const cover = el('div','station-cover'); cover.style.width='44px'; cover.style.height='44px'; cover.style.borderRadius='10px';
-    if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else { cover.innerHTML='📻'; }
-    const body = el('div');
-    const name = el('div','digital'); name.style.fontSize='20px'; name.textContent = st.name || 'Okänd station';
-    const nowEl = el('div','muted digital'); nowEl.dataset.role='now'; nowEl.textContent='—';
-    const meta = el('div','muted digital'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
-    const rowBtns = el('div','row');
-    const btnPlay = el('button','btn small digital'); btnPlay.textContent='SPELA'; btnPlay.addEventListener('click',()=> playStation(st));
-    const btnRm = el('button','btn small digital'); btnRm.textContent='TA BORT'; btnRm.addEventListener('click',()=> removeFav(st.stationuuid));
-    const btnHome = el('a','btn small iconbtn'); btnHome.title='Öppna stationens webbplats'; btnHome.setAttribute('aria-label','Öppna stationens webbplats'); btnHome.innerHTML='<svg class="ico"><use href="#ico-globe"/></svg>'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
-    rowBtns.append(btnPlay, btnRm, btnHome);
-    body.append(name, nowEl, meta, rowBtns); card.append(cover, body); return card;
+    const card=el('div','card'); card.dataset.uuid=st.stationuuid;
+    const cover=el('div','station-cover'); cover.style.width='44px'; cover.style.height='44px'; cover.style.borderRadius='10px'; if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else cover.innerHTML='📻';
+    const body=el('div');
+    const name=el('div','digital'); name.style.fontSize='20px'; name.textContent=st.name||'Okänd station';
+    const nowEl=el('div','muted digital'); nowEl.dataset.role='now'; nowEl.textContent='—';
+    const meta=el('div','muted digital'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
+    const rowBtns=el('div','row');
+    const btnPlay=el('button','btn small digital'); btnPlay.textContent='SPELA'; btnPlay.addEventListener('click',()=>playStation(st));
+    const btnRm=el('button','btn small digital'); btnRm.textContent='TA BORT'; btnRm.addEventListener('click',()=>removeFav(st.stationuuid));
+    const btnHome=el('a','btn small iconbtn'); btnHome.innerHTML='<svg class="ico"><use href="#ico-globe"/></svg>'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
+    rowBtns.append(btnPlay,btnRm,btnHome);
+    body.append(name,nowEl,meta,rowBtns); card.append(cover,body); return card;
   }
 
-  // ======= Populärt (5 i taget) =======
-  const TOP_CHUNK = 5;
-  let topCache = []; let topIndex = 0; let topKey = 'GLOBAL';
-  function resetTop(key){ topCache = []; topIndex = 0; topKey = key || 'GLOBAL'; $('#btnMore').style.display = 'none'; }
-  function renderTopChunk(){
-    const end = Math.min(topIndex + TOP_CHUNK, topCache.length);
-    const frag = document.createDocumentFragment();
-    for(let i=topIndex;i<end;i++){ frag.append(stationCard(topCache[i])); }
-    if(topIndex===0) $('#results').innerHTML='';
-    $('#results').append(frag);
-    $('#resultsEmpty').style.display = (topCache.length===0);
-    topIndex = end;
-    $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
-  }
+  const TOP_CHUNK=5; let topCache=[]; let topIndex=0; let topKey='GLOBAL';
+  function resetTop(key){ topCache=[]; topIndex=0; topKey=key||'GLOBAL'; $('#btnMore').style.display='none'; }
+  function renderTopChunk(){ const end=Math.min(topIndex+TOP_CHUNK,topCache.length); const frag=document.createDocumentFragment(); for(let i=topIndex;i<end;i++){ frag.append(stationCard(topCache[i])); } if(topIndex===0) $('#results').innerHTML=''; $('#results').append(frag); $('#resultsEmpty').style.display=(topCache.length===0); topIndex=end; $('#btnMore').style.display=(topIndex<topCache.length)?'inline-flex':'none'; }
 
-  // ======= Sök & listor =======
   async function search(q){
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none'; $('#btnMore').style.display='none';
-    const query = (q||'').trim();
-    const cc = $('#country').value.trim();
-    if(!query && cc){ return listTop(cc); }
-    if(!query){ return listTop('GLOBAL'); }
-    const enc = encodeURIComponent(query);
-    const tasks = [];
-    let base = `/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=${enc}`;
-    if(cc) base += `&countrycode=${encodeURIComponent(cc)}`;
-    tasks.push(api(base));
-    tasks.push(api(`/json/stations/byname/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
-    tasks.push(api(`/json/stations/bytag/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
-    const settled = await Promise.allSettled(tasks);
-    const results = settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
-    const seen = new Set(); const uniq = [];
-    for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
+    const query=(q||'').trim(); const cc=$('#country').value.trim();
+    if(!query && cc) return listTop(cc);
+    if(!query) return listTop('GLOBAL');
+    const enc=encodeURIComponent(query);
+    const tasks=[];
+    let base=`/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=${enc}`;
+    if(cc) base+=`&countrycode=${encodeURIComponent(cc)}`;
+    tasks.push(api(base), api(`/json/stations/byname/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`), api(`/json/stations/bytag/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
+    const settled=await Promise.allSettled(tasks);
+    const results=settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
+    const seen=new Set(); const uniq=[]; for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
     if(!uniq.length){ $('#resultsEmpty').style.display='block'; return; }
-    const frag = document.createDocumentFragment(); uniq.slice(0,60).forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
+    const frag=document.createDocumentFragment(); uniq.slice(0,60).forEach(st=>frag.append(stationCard(st))); $('#results').append(frag);
   }
 
   async function listTop(scope){
-    const isCountry = scope && scope !== 'GLOBAL';
-    const key = isCountry ? `TOP_${scope}` : 'GLOBAL';
-    if(topKey !== key) resetTop(key);
+    const isCountry=scope && scope!=='GLOBAL'; const key=isCountry?`TOP_${scope}`:'GLOBAL';
+    if(topKey!==key) resetTop(key);
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
-    if(topCache.length === 0){
-      let list = [];
-      if(isCountry){
-        list = await api(`/json/stations/bycountrycodeexact/${encodeURIComponent(scope)}?hidebroken=true&order=clickcount&reverse=true&limit=100`);
-      }else{
-        list = await api(`/json/stations/topclick?limit=100&hidebroken=true`);
-      }
-      topCache = Array.isArray(list) ? list : [];
+    if(topCache.length===0){
+      let list=[]; if(isCountry){ list=await api(`/json/stations/bycountrycodeexact/${encodeURIComponent(scope)}?hidebroken=true&order=clickcount&reverse=true&limit=100`); } else { list=await api(`/json/stations/topclick?limit=100&hidebroken=true`); }
+      topCache=Array.isArray(list)?list:[];
     }
     renderTopChunk();
   }
 
-  // ======= Länder =======
   async function loadCountries(){
-    try{
-      const countries = await api('/json/countries?order=stationcount&reverse=true');
-      const sel = $('#country');
-      countries.forEach(c=>{
-        const opt = document.createElement('option');
-        opt.value = c.iso_3166_1 || c.countrycode || '';
-        if(!opt.value && c.name && c.name.length===2) opt.value = c.name.toUpperCase();
-        opt.textContent = c.name + (c.stationcount ? ` (${c.stationcount})` : '');
-        if(opt.value) sel.appendChild(opt);
-      });
-    }catch(e){ /* ignore */ }
+    try{ const countries=await api('/json/countries?order=stationcount&reverse=true'); const sel=$('#country'); countries.forEach(c=>{ const opt=document.createElement('option'); opt.value=c.iso_3166_1||c.countrycode||''; if(!opt.value && c.name && c.name.length===2) opt.value=c.name.toUpperCase(); opt.textContent=c.name+(c.stationcount?` (${c.stationcount})`:''); if(opt.value) sel.appendChild(opt); }); }catch{}
   }
 
-  // ======= Media Session (iOS) =======
   function setMediaSession(st, info){
     if(!('mediaSession' in navigator)) return;
-    const parsed = parseNP(info);
-    const title = parsed.title || st?.name || 'Live';
-    const artist = parsed.artist || st?.name || '';
-    const album = st?.name || '';
-    const artwork = st?.favicon && st.favicon.startsWith('http')
-      ? [{ src: st.favicon, sizes: '128x128', type: 'image/png' }]
-      : [];
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({ title, artist, album, artwork });
-      navigator.mediaSession.playbackState = (audio.paused ? 'paused' : 'playing');
-      navigator.mediaSession.setActionHandler('play', () => audio.play());
-      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-      navigator.mediaSession.setActionHandler('stop', () => { try{ audio.pause(); }catch{} });
-    } catch {}
+    const p=parseNP(info); const title=p.title||st?.name||'Live'; const artist=p.artist||st?.name||''; const album=st?.name||''; const artwork=st?.favicon&&st.favicon.startsWith('http')?[{src:st.favicon,sizes:'128x128',type:'image/png'}]:[];
+    try{ navigator.mediaSession.metadata=new MediaMetadata({title,artist,album,artwork}); navigator.mediaSession.playbackState=(audio.paused?'paused':'playing'); navigator.mediaSession.setActionHandler('play',()=>audio.play()); navigator.mediaSession.setActionHandler('pause',()=>audio.pause()); navigator.mediaSession.setActionHandler('stop',()=>{try{audio.pause();}catch{}});}catch{}
   }
   function parseNP(info){
-    if(!info) return {};
-    let artist = info.artist || null, title = info.title || null, st = info.streamTitle || '';
-    if((!artist || !title) && st){
-      const p = String(st).split(' - ');
-      if(p.length >= 2){ artist = artist || p[0].trim(); title = title || p.slice(1).join(' - ').trim(); }
-      else { title = title || String(st).trim(); }
-    }
-    return { artist, title, streamTitle: st };
+    if(!info) return {}; let artist=info.artist||null, title=info.title||null, st=info.streamTitle||''; if((!artist||!title)&&st){ const p=String(st).split(' - '); if(p.length>=2){ artist=artist||p[0].trim(); title=title||p.slice(1).join(' - ').trim(); } else { title=title||String(st).trim(); } } return {artist,title,streamTitle:st};
   }
 
-  // ======= Spelare + Now Playing =======
-  const audio = $('#audio'); let hls; let npTimer=null; let currentStream=''; let currentStation=null;
-  const volPop = $('#volPop'); const volBtn = $('#btnVol'); const volSlider = $('#volSlider');
-  const VOL_KEY = 'wr_vol';
+  const audio=$('#audio'); let hls; let npTimer=null; let currentStream=''; let currentStation=null;
+  const volPop=$('#volPop'); const volBtn=$('#btnVol'); const volSlider=$('#volSlider'); const VOL_KEY='wr_vol';
+  const icoPlayPause=$('#icoPlayPause use'); const icoMute=$('#icoMute use');
 
-  const icoPlayPause = $('#icoPlayPause use');
-  const icoMute = $('#icoMute use');
-
-  $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); setMediaSession(currentStation, lastNP); });
+  $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); setMediaSession(currentStation,lastNP); });
   $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; clearInterval(npTimer); hideTicker(); $('#playerName').textContent='—'; $('#playerDetails').textContent='—'; $('#playerBar').style.display='none'; updateButtons(); setMediaSession(null,null); closeVol(); });
-  $('#btnMute').addEventListener('click',()=>{ audio.muted = !audio.muted; updateButtons(); });
-
+  $('#btnMute').addEventListener('click',()=>{ audio.muted=!audio.muted; updateButtons(); });
   function openVol(){ volPop.classList.add('show'); volBtn.setAttribute('aria-expanded','true'); }
   function closeVol(){ volPop.classList.remove('show'); volBtn.setAttribute('aria-expanded','false'); }
-  volBtn.addEventListener('click', (e)=>{ e.stopPropagation(); if(volPop.classList.contains('show')) closeVol(); else openVol(); });
-  window.addEventListener('click', (e)=>{ if(!volPop.contains(e.target) && e.target!==volBtn){ closeVol(); } });
-  window.addEventListener('scroll', closeVol, { passive:true });
+  volBtn.addEventListener('click',(e)=>{ e.stopPropagation(); if(volPop.classList.contains('show')) closeVol(); else openVol(); });
+  window.addEventListener('click',(e)=>{ if(!volPop.contains(e.target) && e.target!==volBtn){ closeVol(); } });
+  window.addEventListener('scroll', closeVol, {passive:true});
 
-  try{
-    const saved = localStorage.getItem(VOL_KEY);
-    if(saved!=null){ const v = Math.min(1, Math.max(0, parseFloat(saved))); audio.volume = v; volSlider.value = String(v); }
-  }catch{}
-  volSlider.addEventListener('input', e=>{ const v = +e.target.value; audio.volume = v; try{ localStorage.setItem(VOL_KEY, String(v)); }catch{} });
+  try{ const saved=localStorage.getItem(VOL_KEY); if(saved!=null){ const v=Math.min(1,Math.max(0,parseFloat(saved))); audio.volume=v; volSlider.value=String(v); } }catch{}
+  volSlider.addEventListener('input',e=>{ const v=+e.target.value; audio.volume=v; try{ localStorage.setItem(VOL_KEY,String(v)); }catch{} });
 
   function updateButtons(){
-    icoPlayPause.setAttribute('href', audio.paused ? '#ico-play' : '#ico-pause');
-    icoMute.setAttribute('href', audio.muted ? '#ico-volume-mute' : '#ico-volume');
-    $('#liveDot').style.display = audio.paused ? 'none' : 'inline-block';
-    if('mediaSession' in navigator){ navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing'; }
+    icoPlayPause.setAttribute('href', audio.paused?'#ico-play':'#ico-pause');
+    icoMute.setAttribute('href', audio.muted?'#ico-volume-mute':'#ico-volume');
+    $('#liveDot').style.display=audio.paused?'none':'inline-block';
+    if('mediaSession' in navigator){ navigator.mediaSession.playbackState=audio.paused?'paused':'playing'; }
   }
 
-  let lastNP = null;
+  let lastNP=null;
   async function playStation(st){
-    currentStation = st;
-    let streamUrl = st.url_resolved || st.url;
-    try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{}
-    if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){
-      const httpsTry = streamUrl.replace(/^http:\/\//i,'https://');
-      try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); streamUrl = httpsTry; }catch{}
-    }
-    currentStream = streamUrl;
+    currentStation=st;
+    let streamUrl=st.url_resolved||st.url;
+    try{ const info=await api('/json/url/'+encodeURIComponent(st.stationuuid)); streamUrl=info?.url||streamUrl; }catch{}
+    if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){ const httpsTry=streamUrl.replace(/^http:\/\//i,'https://'); try{ await fetch(httpsTry,{method:'HEAD',mode:'no-cors'}); streamUrl=httpsTry; }catch{} }
+    currentStream=streamUrl;
 
-    const isHls = /\.m3u8($|\?)/i.test(streamUrl);
+    const isHls=/\.m3u8($|\?)/i.test(streamUrl);
     if(hls){ hls.destroy(); hls=null; }
-    audio.src = '';
-    if(isHls && window.Hls?.isSupported()){
-      hls = new Hls({maxBufferLength:20}); hls.loadSource(streamUrl); hls.attachMedia(audio);
-    } else { audio.src = streamUrl; }
+    audio.src=''; if(isHls && window.Hls?.isSupported()){ hls=new Hls({maxBufferLength:20}); hls.loadSource(streamUrl); hls.attachMedia(audio); } else { audio.src=streamUrl; }
     audio.play();
 
     $('#playerBar').style.display='flex';
-    $('#playerName').textContent = st.name || 'Okänd';
-    $('#playerDetails').textContent = [st.countrycode, st.codec ? (st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')) : null].filter(Boolean).join(' · ');
+    $('#playerName').textContent=st.name||'Okänd';
+    $('#playerDetails').textContent=[st.countrycode, st.codec?(st.codec+(st.bitrate?` ${st.bitrate}kbps`:'')):null].filter(Boolean).join(' · ');
     const cov=$('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
-    const home=$('#btnHome'); home.href = st.homepage||'#';
+    const home=$('#btnHome'); home.href=st.homepage||'#';
     updateButtons();
 
-    setTicker('Lyssnar på ' + (st.name || 'okänd station'));
-    lastNP = { streamTitle: st.name };
-    setMediaSession(st, lastNP);
+    setTicker('Lyssnar på '+(st.name||'okänd station'));
+    lastNP={streamTitle:st.name}; setMediaSession(st,lastNP);
 
     clearInterval(npTimer);
-    const tick = async () => {
-      try{
-        const info = await now(currentStream);
-        lastNP = info || lastNP;
-        const p = parseNP(lastNP);
-        const line = (p.artist && p.title) ? `${p.artist} – ${p.title}` : (p.streamTitle || '—');
-        setTicker(line && line !== '—' ? line : ('Lyssnar på ' + (st.name || 'okänd station')));
-        setMediaSession(st, lastNP);
-      }catch{}
-    };
-    await tick();
-    npTimer = setInterval(tick, 15000);
+    const tick=async()=>{ try{ const info=await now(currentStream); lastNP=info||lastNP; const p=parseNP(lastNP); const line=(p.artist&&p.title)?`${p.artist} – ${p.title}`:(p.streamTitle||'—'); setTicker(line&&line!=='—'?line:('Lyssnar på '+(st.name||'okänd station'))); setMediaSession(st,lastNP); }catch{} };
+    await tick(); npTimer=setInterval(tick,15000);
   }
 
-  // ======= Favoriter =======
-  const favKey = 'wr_favs_v1';
-  const getFavs = () => { try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
-  const setFavs = (x) => localStorage.setItem(favKey, JSON.stringify(x));
-  const isFav = (uuid) => getFavs().some(f=> f.uuid===uuid);
-  function toggleFav(st, btn){
-    const favs = getFavs();
-    const i = favs.findIndex(f=> f.uuid===st.stationuuid);
+  const favKey='wr_favs_v1';
+  const getFavs=()=>{ try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
+  const setFavs=(x)=>localStorage.setItem(favKey,JSON.stringify(x));
+  const isFav=(uuid)=>getFavs().some(f=>f.uuid===uuid);
+  function toggleFav(st,btn){
+    const favs=getFavs(); const i=favs.findIndex(f=>f.uuid===st.stationuuid);
     if(i>=0){ favs.splice(i,1); setFavs(favs); btn.textContent='☆ FAVORIT'; toast('BORTTAGEN'); refreshFavs(); return; }
-    favs.push({uuid: st.stationuuid, snap: st}); setFavs(favs); btn.textContent='★ SPARAD'; toast('TILLAGD'); refreshFavs();
+    favs.push({uuid:st.stationuuid, snap:st}); setFavs(favs); btn.textContent='★ SPARAD'; toast('TILLAGD'); refreshFavs();
   }
-  function removeFav(uuid){ const favs = getFavs().filter(f=> f.uuid!==uuid); setFavs(favs); refreshFavs(); }
+  function removeFav(uuid){ const favs=getFavs().filter(f=>f.uuid!==uuid); setFavs(favs); refreshFavs(); }
 
   let favNpTimer=null;
   async function refreshFavs(){
-    const favs = getFavs();
-    $('#favs').innerHTML=''; $('#favsEmpty').style.display = favs.length ? 'none' : 'block'; if(!favs.length){ clearInterval(favNpTimer); return; }
-    const uuids = favs.map(f=> f.uuid).join(',');
-    let updated=[]; try{ updated = await api('/json/stations/byuuid?uuids=' + encodeURIComponent(uuids)); }catch{}
-    const map = new Map(updated.map(s=> [s.stationuuid, s]));
-    const frag = document.createDocumentFragment();
-    favs.forEach(f=>{ const s = map.get(f.uuid) || f.snap; if(!s) return; frag.append(favCard(s)); });
+    const favs=getFavs();
+    $('#favs').innerHTML=''; $('#favsEmpty').style.display=favs.length?'none':'block'; if(!favs.length){ clearInterval(favNpTimer); return; }
+    const uuids=favs.map(f=>f.uuid).join(','); let updated=[]; try{ updated=await api('/json/stations/byuuid?uuids='+encodeURIComponent(uuids)); }catch{}
+    const map=new Map(updated.map(s=>[s.stationuuid,s])); const frag=document.createDocumentFragment();
+    favs.forEach(f=>{ const s=map.get(f.uuid)||f.snap; if(!s) return; frag.append(favCard(s)); });
     $('#favs').append(frag);
 
     clearInterval(favNpTimer);
-    const tickFavs = async ()=>{
-      const cards = Array.from(document.querySelectorAll('#favs .card'));
-      for(const card of cards){
-        const uuid = card.dataset.uuid;
-        let st = map.get(uuid) || favs.find(f=>f.uuid===uuid)?.snap;
-        if(!st) continue;
-        let url = st.url_resolved || st.url;
-        try{ const info = await api('/json/url/' + encodeURIComponent(uuid)); url = info?.url || url; }catch{}
-        if(location.protocol==='https:' && /^http:\/\//i.test(url)){
-          const httpsTry = url.replace(/^http:\/\//i,'https://');
-          try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); url = httpsTry; }catch{}
-        }
-        try{
-          const np = await now(url);
-          const p = parseNP(np);
-          const line = (p.artist && p.title) ? `${p.artist} – ${p.title}` : (p.streamTitle || '—');
-          const tgt = card.querySelector('[data-role="now"]');
-          if(tgt) tgt.textContent = line || '—';
-        }catch{}
-      }
-    };
-    await tickFavs();
-    favNpTimer = setInterval(tickFavs, 20000);
+    const tickFavs=async()=>{ const cards=Array.from(document.querySelectorAll('#favs .card')); for(const card of cards){ const uuid=card.dataset.uuid; let st=map.get(uuid)||favs.find(f=>f.uuid===uuid)?.snap; if(!st) continue; let url=st.url_resolved||st.url; try{ const info=await api('/json/url/'+encodeURIComponent(uuid)); url=info?.url||url; }catch{} if(location.protocol==='https:'&&/^http:\/\//i.test(url)){ const httpsTry=url.replace(/^http:\/\//i,'https://'); try{ await fetch(httpsTry,{method:'HEAD',mode:'no-cors'}); url=httpsTry; }catch{} } try{ const np=await now(url); const p=parseNP(np); const line=(p.artist&&p.title)?`${p.artist} – ${p.title}`:(p.streamTitle||'—'); const tgt=card.querySelector('[data-role="now"]'); if(tgt) tgt.textContent=line||'—'; }catch{} } };
+    await tickFavs(); favNpTimer=setInterval(tickFavs,20000);
   }
 
-  // ======= Diagnostik =======
   function showDiag(msg){ const d=$('#diag'); d.style.display='block'; d.textContent=msg; d.classList.add('digital'); }
-  $('#btnDiag').addEventListener('click', async ()=>{
-    try{ const stats = await api('/json/stats'); showDiag('PROXY OK · STATIONER: ' + (stats.stations||'?')); }
-    catch(err){ showDiag('PROXY FEL: ' + err.message); }
-  });
+  $('#btnDiag').addEventListener('click', async ()=>{ try{ const stats=await api('/json/stats'); showDiag('PROXY OK · STATIONER: '+(stats.stations||'?')); } catch(err){ showDiag('PROXY FEL: '+err.message); } });
 
-  // ======= Händelser =======
-  $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); document.body.classList.remove('mode-favs'); search(v); });
+  $('#btnSearch').addEventListener('click', ()=>{ const v=$('#q').value.trim(); document.body.classList.remove('mode-favs'); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
-  $('#btnTop').addEventListener('click', ()=> {
-    document.body.classList.remove('mode-favs');
-    const cc = $('#country').value.trim();
-    listTop(cc || 'GLOBAL');
-    window.scrollTo({top:0, behavior:'smooth'});
-  });
-  $('#btnFavs').addEventListener('click', ()=> {
-    document.body.classList.add('mode-favs');
-    document.querySelector('#favsSection').scrollIntoView({behavior:'smooth'});
-  });
+  $('#btnTop').addEventListener('click', ()=>{ document.body.classList.remove('mode-favs'); const cc=$('#country').value.trim(); listTop(cc||'GLOBAL'); window.scrollTo({top:0,behavior:'smooth'}); });
+  $('#btnFavs').addEventListener('click', ()=>{ document.body.classList.add('mode-favs'); document.querySelector('#favsSection').scrollIntoView({behavior:'smooth'}); });
   $('#btnMore').addEventListener('click', renderTopChunk);
-  $('#country').addEventListener('change', ()=>{
-    const q = $('#q').value.trim();
-    document.body.classList.remove('mode-favs');
-    if(q) search(q); else listTop($('#country').value.trim() || 'GLOBAL');
-  });
+  $('#country').addEventListener('change', ()=>{ const q=$('#q').value.trim(); document.body.classList.remove('mode-favs'); if(q) search(q); else listTop($('#country').value.trim()||'GLOBAL'); });
 
-  // ======= Init =======
   (async function init(){
     await loadCountries();
-    try{ await listTop('GLOBAL'); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('INITFEL: ' + e.message); }
+    try{ await listTop('GLOBAL'); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('INITFEL: '+e.message); }
     refreshFavs();
-
     audio.addEventListener('play', ()=>{ if('mediaSession' in navigator){ navigator.mediaSession.playbackState='playing'; } });
     audio.addEventListener('pause', ()=>{ if('mediaSession' in navigator){ navigator.mediaSession.playbackState='paused'; } });
   })();
