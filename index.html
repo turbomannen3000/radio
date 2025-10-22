@@ -2,6 +2,7 @@
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
+  <!-- Ingen mobil-zoom -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>World Radio — proxy-aktiverad</title>
   <meta name="description" content="Lyssna på radiostationer från hela världen. Sök via egen Cloudflare Worker-proxy. Spara favoriter.">
@@ -10,7 +11,8 @@
     *{box-sizing:border-box}
     html,body{height:100%}
     html{ -webkit-text-size-adjust: 100%; }
-    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);
+    body{
+      margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);
       background:radial-gradient(1200px 600px at 15% -10%,#1c1d28 0,transparent 60%),radial-gradient(900px 450px at 110% 10%,#0f172a 0,transparent 55%),var(--bg);
       touch-action: manipulation;
     }
@@ -28,6 +30,7 @@
       background:#0e0f15;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;width:100%;
       font-size:16px; /* iOS anti-zoom */
     }
+    .pill{font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
     .controls{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px}
     .btn{background:#10121a;border:1px solid var(--border);padding:9px 12px;border-radius:10px;color:var(--text);cursor:pointer;font-size:16px}
     .btn:hover{border-color:#2a2d40}
@@ -45,8 +48,8 @@
     .diag{margin-top:8px;font-size:12px;color:#fbbf24}
     .toast{position:fixed;right:12px;bottom:70px;background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
-    .actions-row{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:10px;flex-wrap:wrap}
     .more-wrap{display:flex;justify-content:center;margin:12px 0}
+    .now{font-size:12px;color:#b1ffd2;margin:2px 0}
   </style>
 </head>
 <body>
@@ -87,6 +90,7 @@
     <div class="station-cover" id="playerCover" style="width:36px;height:36px;border-radius:8px"></div>
     <div class="meta">
       <div class="name" id="playerName">—</div>
+      <div class="now" id="playerNow">—</div>
       <div class="muted" id="playerDetails">—</div>
     </div>
     <div class="audio-controls">
@@ -103,8 +107,8 @@
   <audio id="audio" crossorigin="anonymous"></audio>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
-  // ======= Konfiguration: byt till din Worker-URL =======
-  const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev'; // <-- BYT UT DENNA
+  // ======= KONFIG: byt till din Worker-URL =======
+  const API_PROXY = 'https://wradio-proxy.<DITT-NAMN>.workers.dev'; // <-- BYT UT DENNA
 
   // ======= Hjälp =======
   const $ = sel => document.querySelector(sel);
@@ -119,6 +123,12 @@
     if(!r.ok) throw new Error('API ' + r.status);
     return await r.json();
   }
+  async function now(streamUrl){
+    try{
+      const r = await fetch(API_PROXY + '?now=1&stream=' + encodeURIComponent(streamUrl));
+      if(!r.ok) throw 0; return await r.json();
+    }catch{ return null; }
+  }
 
   // ======= UI-kort =======
   function stationCard(st){
@@ -128,7 +138,7 @@
     const body = el('div');
     const name = el('div'); name.textContent = st.name || 'Okänd station';
     const meta = el('div','muted');
-    const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:''));
+    const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')); 
     meta.textContent = parts.join(' · ');
     const tags = el('div','row'); fmtTags(st.tags).forEach(tag=>{ const p=el('span','pill'); p.textContent=tag; tags.append(p); });
     const controls = el('div','controls');
@@ -149,20 +159,21 @@
     if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else { cover.innerHTML='📻'; }
     const body = el('div');
     const name = el('div'); name.textContent = st.name || 'Okänd station'; name.style.fontWeight='600'; name.className='name';
+    const nowEl = el('div','now'); nowEl.textContent='—'; nowEl.dataset.role='now';
     const meta = el('div','muted'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
     const rowBtns = el('div','row');
     const btnPlay = el('button','btn small'); btnPlay.textContent='Spela'; btnPlay.addEventListener('click',()=> playStation(st));
     const btnRm = el('button','btn small'); btnRm.textContent='Ta bort'; btnRm.addEventListener('click',()=> removeFav(st.stationuuid));
     const btnHome = el('a','btn small'); btnHome.textContent='Webbplats'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
     rowBtns.append(btnPlay, btnRm, btnHome);
-    body.append(name, meta, rowBtns); card.append(cover, body); return card;
+    body.append(name, nowEl, meta, rowBtns); card.append(cover, body); return card;
   }
 
-  // ======= Global state för Populärt (pagination 5 i taget) =======
+  // ======= Global state för Populärt (5 i taget) =======
   const TOP_CHUNK = 5;
-  let topCache = [];    // senaste hämtade listan (array)
-  let topIndex = 0;     // nästa index att visa
-  let topKey = 'GLOBAL';// nyckel för cache (t.ex. landskod)
+  let topCache = [];    // listan vi visar ifrån
+  let topIndex = 0;     // nästa index att rendera
+  let topKey = 'GLOBAL';// nyckel (GLOBAL eller landskod)
 
   function resetTop(key){
     topCache = [];
@@ -187,20 +198,17 @@
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none'; $('#btnMore').style.display='none';
     const query = (q||'').trim();
     const cc = $('#country').value.trim(); // ISO2 eller tomt
-    if(!query && cc){
-      // Om bara land valt → visa Populärt i landet
-      return listTop(cc);
-    }
-    if(!query){
-      return listTop('GLOBAL');
-    }
+
+    if(!query && cc){ return listTop(cc); }
+    if(!query){ return listTop('GLOBAL'); }
+
     const enc = encodeURIComponent(query);
     const tasks = [];
     // Stations/search med ev. landfilter
     let base = `/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=${enc}`;
     if(cc) base += `&countrycode=${encodeURIComponent(cc)}`;
     tasks.push(api(base));
-    // Dessa hjälper ibland att hitta mer
+    // kompletterande
     tasks.push(api(`/json/stations/byname/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
     tasks.push(api(`/json/stations/bytag/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
 
@@ -222,7 +230,6 @@
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
 
     if(topCache.length === 0){
-      // Hämta upp till 100 och paginera lokalt
       let list = [];
       if(isCountry){
         list = await api(`/json/stations/bycountrycodeexact/${encodeURIComponent(scope)}?hidebroken=true&order=clickcount&reverse=true&limit=100`);
@@ -231,7 +238,7 @@
       }
       topCache = Array.isArray(list) ? list : [];
     }
-    renderTopChunk(); // visar 5 första
+    renderTopChunk(); // 5 första
   }
 
   // ======= Länder (dropdown) =======
@@ -242,7 +249,6 @@
       countries.forEach(c=>{
         const opt = document.createElement('option');
         opt.value = c.iso_3166_1 || c.countrycode || '';
-        // Fallback om iso-kod saknas
         if(!opt.value && c.name && c.name.length===2) opt.value = c.name.toUpperCase();
         opt.textContent = c.name + (c.stationcount ? ` (${c.stationcount})` : '');
         if(opt.value) sel.appendChild(opt);
@@ -250,23 +256,23 @@
     }catch(e){ /* ignore */ }
   }
 
-  // ======= Spelare =======
-  const audio = $('#audio'); let hls;
+  // ======= Spelare + Now Playing =======
+  const audio = $('#audio'); let hls; let npTimer=null; let currentStream='';
   $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); });
-  $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; updateButtons(); });
+  $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; clearInterval(npTimer); $('#playerNow').textContent='—'; updateButtons(); });
   $('#btnMute').addEventListener('click',()=>{ audio.muted = !audio.muted; updateButtons(); });
   $('#vol').addEventListener('input', e=>{ audio.volume = +e.target.value; });
   function updateButtons(){ $('#btnPausePlay').textContent = audio.paused ? '▶' : '⏸'; $('#btnMute').textContent = audio.muted ? '🔇' : '🔊'; }
 
   async function playStation(st){
     let streamUrl = st.url_resolved || st.url;
-    // Hämta kanonisk URL via API
     try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{}
-    // Mixed content-fix
     if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){
       const httpsTry = streamUrl.replace(/^http:\/\//i,'https://');
       try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); streamUrl = httpsTry; }catch{}
     }
+    currentStream = streamUrl;
+
     const isHls = /\.m3u8($|\?)/i.test(streamUrl);
     if(hls){ hls.destroy(); hls=null; }
     audio.src = '';
@@ -281,9 +287,21 @@
     const cov=$('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
     const home=$('#btnHome'); home.href = st.homepage||'#';
     updateButtons();
+
+    // Now Playing (15s)
+    clearInterval(npTimer);
+    const tick = async () => {
+      try{
+        const info = await now(currentStream);
+        const line = info ? (info.artist && info.title ? `${info.artist} – ${info.title}` : (info.streamTitle || '—')) : '—';
+        $('#playerNow').textContent = line || '—';
+      }catch{ $('#playerNow').textContent = '—'; }
+    };
+    await tick();
+    npTimer = setInterval(tick, 15000);
   }
 
-  // ======= Favoriter =======
+  // ======= Favoriter (+ Now Playing) =======
   const favKey = 'wr_favs_v1';
   const getFavs = () => { try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
   const setFavs = (x) => localStorage.setItem(favKey, JSON.stringify(x));
@@ -295,15 +313,42 @@
     favs.push({uuid: st.stationuuid, snap: st}); setFavs(favs); btn.textContent='★ Sparad'; toast('Tillagd i favoriter'); refreshFavs();
   }
   function removeFav(uuid){ const favs = getFavs().filter(f=> f.uuid!==uuid); setFavs(favs); refreshFavs(); }
+
+  let favNpTimer=null;
   async function refreshFavs(){
     const favs = getFavs();
-    $('#favs').innerHTML=''; $('#favsEmpty').style.display = favs.length ? 'none' : 'block'; if(!favs.length) return;
+    $('#favs').innerHTML=''; $('#favsEmpty').style.display = favs.length ? 'none' : 'block'; if(!favs.length){ clearInterval(favNpTimer); return; }
     const uuids = favs.map(f=> f.uuid).join(',');
     let updated=[]; try{ updated = await api('/json/stations/byuuid?uuids=' + encodeURIComponent(uuids)); }catch{}
     const map = new Map(updated.map(s=> [s.stationuuid, s]));
     const frag = document.createDocumentFragment();
     favs.forEach(f=>{ const s = map.get(f.uuid) || f.snap; if(!s) return; frag.append(favCard(s)); });
     $('#favs').append(frag);
+
+    // Now Playing för favoriter (20s)
+    clearInterval(favNpTimer);
+    const tickFavs = async ()=>{
+      const cards = Array.from(document.querySelectorAll('#favs .card'));
+      for(const card of cards){
+        const uuid = card.dataset.uuid;
+        let st = map.get(uuid) || favs.find(f=>f.uuid===uuid)?.snap;
+        if(!st) continue;
+        let url = st.url_resolved || st.url;
+        try{ const info = await api('/json/url/' + encodeURIComponent(uuid)); url = info?.url || url; }catch{}
+        if(location.protocol==='https:' && /^http:\/\//i.test(url)){
+          const httpsTry = url.replace(/^http:\/\//i,'https://');
+          try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); url = httpsTry; }catch{}
+        }
+        try{
+          const np = await now(url);
+          const line = np ? (np.artist && np.title ? `${np.artist} – ${np.title}` : (np.streamTitle || '—')) : '—';
+          const tgt = card.querySelector('[data-role="now"]');
+          if(tgt) tgt.textContent = line || '—';
+        }catch{}
+      }
+    };
+    await tickFavs();
+    favNpTimer = setInterval(tickFavs, 20000);
   }
 
   // ======= Diagnostik =======
@@ -322,7 +367,6 @@
   });
   $('#btnMore').addEventListener('click', renderTopChunk);
   $('#country').addEventListener('change', ()=>{
-    // Om vi är i Populärt-läget, ladda om top för land; annars filtra sökning
     const q = $('#q').value.trim();
     if(q) search(q); else listTop($('#country').value.trim() || 'GLOBAL');
   });
