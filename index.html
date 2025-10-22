@@ -4,13 +4,13 @@
   <meta charset="utf-8" />
   <!-- Ingen mobil-zoom -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>World Radio — proxy-aktiverad</title>
+  <title>World Radio</title>
   <meta name="description" content="Lyssna på radiostationer från hela världen. Sök via egen Cloudflare Worker-proxy. Spara favoriter.">
   <!-- Retro digitalfont för ticker -->
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
     :root{
-      --bg:#0b0c10;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--border:#222433;
+      --bg:#000;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--border:#222433;
       --green:#b1ffd2; --player-h: 110px; --ticker-h: 34px;
     }
     *{box-sizing:border-box}
@@ -18,11 +18,11 @@
     html{ -webkit-text-size-adjust: 100%; }
     body{
       margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);
-      background:radial-gradient(1200px 600px at 15% -10%,#1c1d28 0,transparent 60%),radial-gradient(900px 450px at 110% 10%,#0f172a 0,transparent 55%),var(--bg);
+      background:#000;
       touch-action: manipulation;
-      padding-bottom: calc(var(--player-h) + var(--ticker-h) + 16px); /* så innehåll inte hamnar under spelaren */
+      padding-bottom: calc(var(--player-h) + var(--ticker-h) + env(safe-area-inset-bottom) + 20px);
     }
-    header{position:sticky;top:0;background:rgba(11,12,16,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
+    header{position:sticky;top:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
     .wrap{max-width:1100px;margin:0 auto;padding:14px 12px}
     .title{display:flex;gap:8px;align-items:center;font-weight:700}
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
@@ -43,12 +43,17 @@
     .btn.primary{background:linear-gradient(180deg,#4f46e5,#4338ca);border:none}
     .btn.small{padding:6px 9px;border-radius:8px}
     .btn.ghost{background:transparent;border:1px dashed #2a2d40}
+    .iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px}
+    .icon{font-size:18px;line-height:1}
+
     .h{margin:16px 0 8px;font-size:13px;color:#aab3d0;text-transform:uppercase;letter-spacing:.12em}
     .empty{opacity:.7;border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center}
     .diag{margin-top:8px;font-size:12px;color:#fbbf24}
     .toast{position:fixed;right:12px;bottom:calc(var(--player-h) + var(--ticker-h) + 12px);background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
-    .more-wrap{display:flex;justify-content:center;margin:12px 0}
+
+    /* "Visa mer" håller sig synlig just ovanför spelaren */
+    .more-wrap{display:flex;justify-content:center;margin:12px 0;position:sticky;bottom:calc(var(--player-h) + var(--ticker-h) + 8px);z-index:5}
 
     /* Digital ticker ovanför spelaren */
     .ticker{
@@ -68,7 +73,7 @@
     /* Spelare (högre) */
     .audio{
       position:fixed;left:0;right:0;bottom:0;height:var(--player-h);
-      background:rgba(11,12,16,.94);backdrop-filter:blur(8px);border-top:1px solid var(--border);
+      background:rgba(0,0,0,.94);backdrop-filter:blur(8px);border-top:1px solid var(--border);
       display:flex;gap:12px;align-items:center;padding:10px 12px;z-index:21;
     }
     .audio .station-cover{width:64px;height:64px;border-radius:14px}
@@ -78,12 +83,16 @@
     .liveDot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 12px rgba(239,68,68,.8);margin-right:6px;display:inline-block;vertical-align:middle}
     .audio-controls{display:flex;gap:8px;align-items:center;margin-left:auto}
     .audio input[type="range"]{width:120px}
+
+    /* Favoriter-vy */
+    body.mode-favs #resultsSection{display:none}
+    body.mode-favs #favsSection{display:block}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <div class="title">World Radio — via proxy</div>
+      <div class="title">World Radio</div>
       <div class="row" style="margin-top:10px">
         <input id="q" type="search" placeholder="Sök station eller tagg (t.ex. 'jazz', 'bbc')" autocomplete="off" />
         <select id="country">
@@ -91,6 +100,7 @@
         </select>
         <button class="btn" id="btnSearch">Sök</button>
         <button class="btn" id="btnTop">Populärt</button>
+        <button class="btn" id="btnFavs">Favoriter</button>
         <button class="btn" id="btnDiag">Diagnostik</button>
       </div>
       <div id="diag" class="diag" style="display:none"></div>
@@ -98,7 +108,7 @@
   </header>
 
   <main class="wrap">
-    <section>
+    <section id="resultsSection">
       <h2 class="h">Resultat</h2>
       <div id="results" class="grid"></div>
       <div id="resultsEmpty" class="empty" style="display:none">Inga träffar ännu — sök (ex. "BBC", "Jazz") eller tryck <em>Populärt</em>.</div>
@@ -107,7 +117,7 @@
       </div>
     </section>
 
-    <section class="nopad">
+    <section id="favsSection" class="nopad">
       <h2 class="h">Favoriter</h2>
       <div id="favs" class="grid"></div>
       <div id="favsEmpty" class="empty">Inga favoriter än. Lägg till någon station så visas den här.</div>
@@ -129,13 +139,13 @@
       <button class="btn small" id="btnPausePlay" title="Spela/Pausa">▶</button>
       <button class="btn small" id="btnMute" title="Ljud av/på">🔊</button>
       <input id="vol" type="range" min="0" max="1" step="0.01" value="1" title="Volym"/>
-      <a class="btn small" id="btnHome" target="_blank" rel="noopener">Webbplats</a>
+      <a class="btn small iconbtn" id="btnHome" target="_blank" rel="noopener" title="Öppna stationens webbplats" aria-label="Öppna stationens webbplats"><span class="icon" aria-hidden="true">🌐</span></a>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
-  <audio id="audio" crossorigin="anonymous"></audio>
+  <audio id="audio" crossorigin="anonymous" playsinline></audio>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
   // ======= KONFIG: din Worker-proxy =======
@@ -187,7 +197,7 @@
     const controls = el('div','controls');
     const btnPlay = el('button','btn primary'); btnPlay.textContent='Spela';
     const btnFav = el('button','btn'); btnFav.textContent = isFav(st.stationuuid) ? '★ Sparad' : '☆ Favorit';
-    const btnHome = el('a','btn'); btnHome.textContent='Webbplats'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
+    const btnHome = el('a','btn iconbtn'); btnHome.title='Öppna stationens webbplats'; btnHome.setAttribute('aria-label','Öppna stationens webbplats'); btnHome.innerHTML='<span class="icon" aria-hidden="true">🌐</span>'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
     btnPlay.addEventListener('click', ()=> playStation(st));
     btnFav.addEventListener('click', ()=> toggleFav(st, btnFav));
     controls.append(btnPlay, btnFav, btnHome);
@@ -207,7 +217,7 @@
     const rowBtns = el('div','row');
     const btnPlay = el('button','btn small'); btnPlay.textContent='Spela'; btnPlay.addEventListener('click',()=> playStation(st));
     const btnRm = el('button','btn small'); btnRm.textContent='Ta bort'; btnRm.addEventListener('click',()=> removeFav(st.stationuuid));
-    const btnHome = el('a','btn small'); btnHome.textContent='Webbplats'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
+    const btnHome = el('a','btn small iconbtn'); btnHome.title='Öppna stationens webbplats'; btnHome.setAttribute('aria-label','Öppna stationens webbplats'); btnHome.innerHTML='<span class="icon" aria-hidden="true">🌐</span>'; btnHome.href=st.homepage||'#'; btnHome.target='_blank'; btnHome.rel='noopener';
     rowBtns.append(btnPlay, btnRm, btnHome);
     body.append(name, nowEl, meta, rowBtns); card.append(cover, body); return card;
   }
@@ -280,8 +290,23 @@
     }catch(e){ /* ignore */ }
   }
 
+  // ======= Media Session (iPhone låsskärm) =======
+  function updateMediaSession(st, info){
+    if(!('mediaSession' in navigator)) return;
+    const title = info?.title || info?.streamTitle || st?.name || 'Live';
+    const artist = info?.artist || st?.name || '';
+    const album = st?.name || '';
+    const artwork = st?.favicon ? [{ src: st.favicon, sizes: '128x128', type: 'image/png' }] : [];
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({ title, artist, album, artwork });
+      navigator.mediaSession.setActionHandler('play', () => audio.play());
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('stop', () => { try{ audio.pause(); }catch{} });
+    } catch {}
+  }
+
   // ======= Spelare + Now Playing =======
-  const audio = $('#audio'); let hls; let npTimer=null; let currentStream='';
+  const audio = $('#audio'); let hls; let npTimer=null; let currentStream=''; let currentStation=null;
   $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); });
   $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; clearInterval(npTimer); hideTicker(); $('#playerName').textContent='—'; $('#playerDetails').textContent='—'; $('#playerBar').style.display='none'; updateButtons(); });
   $('#btnMute').addEventListener('click',()=>{ audio.muted = !audio.muted; updateButtons(); });
@@ -289,6 +314,7 @@
   function updateButtons(){ $('#btnPausePlay').textContent = audio.paused ? '▶' : '⏸'; $('#btnMute').textContent = audio.muted ? '🔇' : '🔊'; $('#liveDot').style.display = audio.paused ? 'none' : 'inline-block'; }
 
   async function playStation(st){
+    currentStation = st;
     let streamUrl = st.url_resolved || st.url;
     try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{}
     if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){
@@ -313,6 +339,7 @@
     updateButtons();
 
     setTicker('Lyssnar på ' + (st.name || 'okänd station'));
+    updateMediaSession(st, { title: st.name, artist: '', streamTitle: st.name });
 
     clearInterval(npTimer);
     const tick = async () => {
@@ -320,6 +347,7 @@
         const info = await now(currentStream);
         const line = info ? (info.artist && info.title ? `${info.artist} – ${info.title}` : (info.streamTitle || '—')) : '—';
         setTicker(line && line !== '—' ? line : ('Lyssnar på ' + (st.name || 'okänd station')));
+        updateMediaSession(st, info || { streamTitle: line });
       }catch{ /* behåll föregående */ }
     };
     await tick();
@@ -386,12 +414,19 @@
   $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
   $('#btnTop').addEventListener('click', ()=> {
+    document.body.classList.remove('mode-favs');
     const cc = $('#country').value.trim();
     listTop(cc || 'GLOBAL');
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+  $('#btnFavs').addEventListener('click', ()=> {
+    document.body.classList.add('mode-favs');
+    document.querySelector('#favsSection').scrollIntoView({behavior:'smooth'});
   });
   $('#btnMore').addEventListener('click', renderTopChunk);
   $('#country').addEventListener('change', ()=>{
     const q = $('#q').value.trim();
+    document.body.classList.remove('mode-favs');
     if(q) search(q); else listTop($('#country').value.trim() || 'GLOBAL');
   });
 
