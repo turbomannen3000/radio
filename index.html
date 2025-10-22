@@ -38,13 +38,17 @@
     }
     .pill{font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
     .controls{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px}
-    .btn{background:#10121a;border:1px solid var(--border);padding:9px 12px;border-radius:10px;color:var(--text);cursor:pointer;font-size:16px}
+    .btn{
+      background:#10121a;border:1px solid var(--border);padding:9px 12px;border-radius:10px;color:var(--text);cursor:pointer;font-size:16px;
+      text-decoration:none; /* FIX: ta bort underline */
+    }
     .btn:hover{border-color:#2a2d40}
     .btn.primary{background:linear-gradient(180deg,#4f46e5,#4338ca);border:none}
     .btn.small{padding:6px 9px;border-radius:8px}
     .btn.ghost{background:transparent;border:1px dashed #2a2d40}
-    .iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px}
-    .icon{font-size:18px;line-height:1}
+    .iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;line-height:1;text-decoration:none} /* FIX: ingen underline, kompakt radavstånd */
+    .btn:link,.btn:visited{ text-decoration:none } /* FIX: säkerställ ingen underline i alla lägen */
+    .icon{font-size:18px;line-height:1;display:block} /* FIX: ingen baseline-linje */
 
     .h{margin:16px 0 8px;font-size:13px;color:#aab3d0;text-transform:uppercase;letter-spacing:.12em}
     .empty{opacity:.7;border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center}
@@ -52,8 +56,8 @@
     .toast{position:fixed;right:12px;bottom:calc(var(--player-h) + var(--ticker-h) + 12px);background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
 
-    /* "Visa mer" håller sig synlig just ovanför spelaren */
-    .more-wrap{display:flex;justify-content:center;margin:12px 0;position:sticky;bottom:calc(var(--player-h) + var(--ticker-h) + 8px);z-index:5}
+    /* "Visa mer" – inte sticky, bara längst ned efter stationerna */
+    .more-wrap{display:flex;justify-content:center;margin:16px 0 24px}
 
     /* Digital ticker ovanför spelaren */
     .ticker{
@@ -139,7 +143,10 @@
       <button class="btn small" id="btnPausePlay" title="Spela/Pausa">▶</button>
       <button class="btn small" id="btnMute" title="Ljud av/på">🔊</button>
       <input id="vol" type="range" min="0" max="1" step="0.01" value="1" title="Volym"/>
-      <a class="btn small iconbtn" id="btnHome" target="_blank" rel="noopener" title="Öppna stationens webbplats" aria-label="Öppna stationens webbplats"><span class="icon" aria-hidden="true">🌐</span></a>
+      <!-- Jordglob utan vit linje -->
+      <a class="btn small iconbtn" id="btnHome" target="_blank" rel="noopener" title="Öppna stationens webbplats" aria-label="Öppna stationens webbplats">
+        <span class="icon" aria-hidden="true">🌐</span>
+      </a>
     </div>
   </div>
 
@@ -177,7 +184,6 @@
     const span = $('#tickerText');
     const msg = (text || '').trim() || '—';
     span.textContent = '   ' + msg + '   ';
-    // starta om CSS-animation
     span.classList.remove('tickerRun'); void span.offsetWidth; span.classList.add('tickerRun');
     bar.style.display = 'flex';
   }
@@ -233,7 +239,9 @@
     if(topIndex===0) $('#results').innerHTML='';
     $('#results').append(frag);
     $('#resultsEmpty').style.display = (topCache.length===0);
-    topIndex = end; $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
+    topIndex = end;
+    // Visa knappen endast när det finns mer att visa
+    $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
   }
 
   // ======= Sök & listor =======
@@ -256,6 +264,7 @@
     for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
     if(!uniq.length){ $('#resultsEmpty').style.display='block'; return; }
     const frag = document.createDocumentFragment(); uniq.slice(0,60).forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
+    // Om fler än 60 resultat vill du ev. paginera här också.
   }
 
   async function listTop(scope){
@@ -291,151 +300,34 @@
   }
 
   // ======= Media Session (iPhone låsskärm) =======
-  function updateMediaSession(st, info){
+  function setMediaSession(st, info){
     if(!('mediaSession' in navigator)) return;
-    const title = info?.title || info?.streamTitle || st?.name || 'Live';
-    const artist = info?.artist || st?.name || '';
+    const parsed = parseNP(info);
+    const title = parsed.title || st?.name || 'Live';
+    const artist = parsed.artist || st?.name || '';
     const album = st?.name || '';
-    const artwork = st?.favicon ? [{ src: st.favicon, sizes: '128x128', type: 'image/png' }] : [];
+    const artwork = st?.favicon && st.favicon.startsWith('http')
+      ? [{ src: st.favicon, sizes: '128x128', type: 'image/png' }]
+      : [];
     try {
       navigator.mediaSession.metadata = new MediaMetadata({ title, artist, album, artwork });
+      navigator.mediaSession.playbackState = (audio.paused ? 'paused' : 'playing');
       navigator.mediaSession.setActionHandler('play', () => audio.play());
       navigator.mediaSession.setActionHandler('pause', () => audio.pause());
       navigator.mediaSession.setActionHandler('stop', () => { try{ audio.pause(); }catch{} });
     } catch {}
   }
+  function parseNP(info){
+    if(!info) return {};
+    let artist = info.artist || null, title = info.title || null, st = info.streamTitle || '';
+    if((!artist || !title) && st){
+      const p = String(st).split(' - ');
+      if(p.length >= 2){ artist = artist || p[0].trim(); title = title || p.slice(1).join(' - ').trim(); }
+      else { title = title || String(st).trim(); }
+    }
+    return { artist, title, streamTitle: st };
+  }
 
   // ======= Spelare + Now Playing =======
   const audio = $('#audio'); let hls; let npTimer=null; let currentStream=''; let currentStation=null;
-  $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); });
-  $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; clearInterval(npTimer); hideTicker(); $('#playerName').textContent='—'; $('#playerDetails').textContent='—'; $('#playerBar').style.display='none'; updateButtons(); });
-  $('#btnMute').addEventListener('click',()=>{ audio.muted = !audio.muted; updateButtons(); });
-  $('#vol').addEventListener('input', e=>{ audio.volume = +e.target.value; });
-  function updateButtons(){ $('#btnPausePlay').textContent = audio.paused ? '▶' : '⏸'; $('#btnMute').textContent = audio.muted ? '🔇' : '🔊'; $('#liveDot').style.display = audio.paused ? 'none' : 'inline-block'; }
-
-  async function playStation(st){
-    currentStation = st;
-    let streamUrl = st.url_resolved || st.url;
-    try{ const info = await api('/json/url/' + encodeURIComponent(st.stationuuid)); streamUrl = info?.url || streamUrl; }catch{}
-    if(location.protocol==='https:' && /^http:\/\//i.test(streamUrl)){
-      const httpsTry = streamUrl.replace(/^http:\/\//i,'https://');
-      try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); streamUrl = httpsTry; }catch{}
-    }
-    currentStream = streamUrl;
-
-    const isHls = /\.m3u8($|\?)/i.test(streamUrl);
-    if(hls){ hls.destroy(); hls=null; }
-    audio.src = '';
-    if(isHls && window.Hls?.isSupported()){
-      hls = new Hls({maxBufferLength:20}); hls.loadSource(streamUrl); hls.attachMedia(audio);
-    } else { audio.src = streamUrl; }
-    audio.play();
-
-    $('#playerBar').style.display='flex';
-    $('#playerName').textContent = st.name || 'Okänd';
-    $('#playerDetails').textContent = [st.countrycode, st.codec ? (st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')) : null].filter(Boolean).join(' · ');
-    const cov=$('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
-    const home=$('#btnHome'); home.href = st.homepage||'#';
-    updateButtons();
-
-    setTicker('Lyssnar på ' + (st.name || 'okänd station'));
-    updateMediaSession(st, { title: st.name, artist: '', streamTitle: st.name });
-
-    clearInterval(npTimer);
-    const tick = async () => {
-      try{
-        const info = await now(currentStream);
-        const line = info ? (info.artist && info.title ? `${info.artist} – ${info.title}` : (info.streamTitle || '—')) : '—';
-        setTicker(line && line !== '—' ? line : ('Lyssnar på ' + (st.name || 'okänd station')));
-        updateMediaSession(st, info || { streamTitle: line });
-      }catch{ /* behåll föregående */ }
-    };
-    await tick();
-    npTimer = setInterval(tick, 15000);
-  }
-
-  // ======= Favoriter (+ Now Playing) =======
-  const favKey = 'wr_favs_v1';
-  const getFavs = () => { try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
-  const setFavs = (x) => localStorage.setItem(favKey, JSON.stringify(x));
-  const isFav = (uuid) => getFavs().some(f=> f.uuid===uuid);
-  function toggleFav(st, btn){
-    const favs = getFavs();
-    const i = favs.findIndex(f=> f.uuid===st.stationuuid);
-    if(i>=0){ favs.splice(i,1); setFavs(favs); btn.textContent='☆ Favorit'; toast('Borttagen från favoriter'); refreshFavs(); return; }
-    favs.push({uuid: st.stationuuid, snap: st}); setFavs(favs); btn.textContent='★ Sparad'; toast('Tillagd i favoriter'); refreshFavs();
-  }
-  function removeFav(uuid){ const favs = getFavs().filter(f=> f.uuid!==uuid); setFavs(favs); refreshFavs(); }
-
-  let favNpTimer=null;
-  async function refreshFavs(){
-    const favs = getFavs();
-    $('#favs').innerHTML=''; $('#favsEmpty').style.display = favs.length ? 'none' : 'block'; if(!favs.length){ clearInterval(favNpTimer); return; }
-    const uuids = favs.map(f=> f.uuid).join(',');
-    let updated=[]; try{ updated = await api('/json/stations/byuuid?uuids=' + encodeURIComponent(uuids)); }catch{}
-    const map = new Map(updated.map(s=> [s.stationuuid, s]));
-    const frag = document.createDocumentFragment();
-    favs.forEach(f=>{ const s = map.get(f.uuid) || f.snap; if(!s) return; frag.append(favCard(s)); });
-    $('#favs').append(frag);
-
-    clearInterval(favNpTimer);
-    const tickFavs = async ()=>{
-      const cards = Array.from(document.querySelectorAll('#favs .card'));
-      for(const card of cards){
-        const uuid = card.dataset.uuid;
-        let st = map.get(uuid) || favs.find(f=>f.uuid===uuid)?.snap;
-        if(!st) continue;
-        let url = st.url_resolved || st.url;
-        try{ const info = await api('/json/url/' + encodeURIComponent(uuid)); url = info?.url || url; }catch{}
-        if(location.protocol==='https:' && /^http:\/\//i.test(url)){
-          const httpsTry = url.replace(/^http:\/\//i,'https://');
-          try{ await fetch(httpsTry, { method:'HEAD', mode:'no-cors' }); url = httpsTry; }catch{}
-        }
-        try{
-          const np = await now(url);
-          const line = np ? (np.artist && np.title ? `${np.artist} – ${np.title}` : (np.streamTitle || '—')) : '—';
-          const tgt = card.querySelector('[data-role="now"]');
-          if(tgt) tgt.textContent = line || '—';
-        }catch{}
-      }
-    };
-    await tickFavs();
-    favNpTimer = setInterval(tickFavs, 20000);
-  }
-
-  // ======= Diagnostik =======
-  function showDiag(msg){ const d=$('#diag'); d.style.display='block'; d.textContent=msg; }
-  $('#btnDiag').addEventListener('click', async ()=>{
-    try{ const stats = await api('/json/stats'); showDiag('Proxy OK · stationer: ' + (stats.stations||'?')); }
-    catch(err){ showDiag('Proxy FEL: ' + err.message); }
-  });
-
-  // ======= Händelser =======
-  $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); search(v); });
-  $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
-  $('#btnTop').addEventListener('click', ()=> {
-    document.body.classList.remove('mode-favs');
-    const cc = $('#country').value.trim();
-    listTop(cc || 'GLOBAL');
-    window.scrollTo({top:0, behavior:'smooth'});
-  });
-  $('#btnFavs').addEventListener('click', ()=> {
-    document.body.classList.add('mode-favs');
-    document.querySelector('#favsSection').scrollIntoView({behavior:'smooth'});
-  });
-  $('#btnMore').addEventListener('click', renderTopChunk);
-  $('#country').addEventListener('change', ()=>{
-    const q = $('#q').value.trim();
-    document.body.classList.remove('mode-favs');
-    if(q) search(q); else listTop($('#country').value.trim() || 'GLOBAL');
-  });
-
-  // ======= Init =======
-  (async function init(){
-    await loadCountries();
-    try{ await listTop('GLOBAL'); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('Initfel: ' + e.message); }
-    refreshFavs();
-  })();
-  </script>
-</body>
-</html>
+  $('#btnPausePlay'
