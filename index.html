@@ -77,10 +77,16 @@
     }
     .audio .station-cover{width:72px;height:72px;border-radius:14px}
     .audio .meta{min-width:0;display:flex;flex-direction:column;gap:6px;flex:1}
+    /* Se till att text alltid är horisontell (iOS/line-clamp quirks) */
+    .audio .meta, .meta .name, #playerName, #playerDetails{
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed;
+      white-space: normal;
+    }
     .meta .name{font-size:22px}
     /* 2 rader desktop */
     .meta .name span#playerName{
-      display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:normal;
+      display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
     }
     .meta .muted{font-size:13px}
     .liveDot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 12px rgba(239,68,68,.8);margin-right:6px;display:inline-block;vertical-align:middle}
@@ -110,20 +116,23 @@
     .vol-slider::-moz-range-track{ background:#0c1320; border:1px solid #2a2d40; }
     .vol-slider::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--green); box-shadow:0 0 10px rgba(177,255,210,.55); }
 
-    /* Mobil: högre spelare + 3 rader för namn + kontroller på rad 2 */
+    /* Mobil: högre spelare + text ovanför knappar (grid areas) + 3 rader namn */
     @media (max-width: 720px){
-      :root{ --player-h: 170px; }               /* <-- HÖGRE PÅ MOBIL */
+      :root{ --player-h: 170px; }
       .audio{
         display:grid;
-        grid-template-columns: 80px 1fr;
-        grid-template-rows: auto auto;
+        grid-template-columns: 84px 1fr;
+        grid-template-areas:
+          "cover meta"
+          "controls controls";
+        grid-auto-rows: auto;
         align-items:start;
         gap:10px 12px;
       }
-      #playerCover{ grid-row: 1 / span 2; }
-      .audio .meta{ grid-column: 2; grid-row: 1; }
-      .audio-controls{ grid-column: 1 / -1; grid-row: 2; margin-left:0; justify-content:space-between; }
-      .meta .name span#playerName{ -webkit-line-clamp: 3; }  /* <-- 3 rader på mobil */
+      #playerCover{ grid-area: cover; }
+      .audio .meta{ grid-area: meta; }
+      .audio-controls{ grid-area: controls; margin-left:0; justify-content:space-between; }
+      .meta .name span#playerName{ -webkit-line-clamp: 3; }  /* 3 rader på mobil */
     }
 
     /* Favoriter-vy */
