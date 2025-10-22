@@ -2,11 +2,11 @@
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
-  <!-- Disable zoom on mobile -->
+  <!-- Ingen mobil-zoom -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>World Radio — proxy-aktiverad</title>
   <meta name="description" content="Lyssna på radiostationer från hela världen. Sök via egen Cloudflare Worker-proxy. Spara favoriter.">
-  <!-- Digital font for ticker -->
+  <!-- Retro digitalfont för ticker -->
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
     :root{
@@ -20,7 +20,7 @@
       margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);
       background:radial-gradient(1200px 600px at 15% -10%,#1c1d28 0,transparent 60%),radial-gradient(900px 450px at 110% 10%,#0f172a 0,transparent 55%),var(--bg);
       touch-action: manipulation;
-      padding-bottom: calc(var(--player-h) + var(--ticker-h) + 16px); /* so content isn't hidden behind fixed bars */
+      padding-bottom: calc(var(--player-h) + var(--ticker-h) + 16px); /* så innehåll inte hamnar under spelaren */
     }
     header{position:sticky;top:0;background:rgba(11,12,16,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
     .wrap{max-width:1100px;margin:0 auto;padding:14px 12px}
@@ -50,7 +50,7 @@
     .toast.show{opacity:1;transform:none}
     .more-wrap{display:flex;justify-content:center;margin:12px 0}
 
-    /* Ticker (digital) */
+    /* Digital ticker ovanför spelaren */
     .ticker{
       position:fixed;left:0;right:0;bottom:var(--player-h);height:var(--ticker-h);
       background:#0a1112;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
@@ -65,7 +65,7 @@
     .tickerRun{display:inline-block;padding-left:100%;will-change:transform;animation: ticker 20s linear infinite}
     @keyframes ticker{ from{ transform:translateX(0);} to{ transform:translateX(-100%);} }
 
-    /* Player (bigger) */
+    /* Spelare (högre) */
     .audio{
       position:fixed;left:0;right:0;bottom:0;height:var(--player-h);
       background:rgba(11,12,16,.94);backdrop-filter:blur(8px);border-top:1px solid var(--border);
@@ -114,10 +114,10 @@
     </section>
   </main>
 
-  <!-- Digital ticker bar just above the player -->
+  <!-- Digital ticker-bar -->
   <div class="ticker" id="ticker"><div class="tickerInner"><span class="tickerRun" id="tickerText"></span></div></div>
 
-  <!-- Player -->
+  <!-- Spelare -->
   <div class="audio" id="playerBar" style="display:none">
     <div class="station-cover" id="playerCover"></div>
     <div class="meta">
@@ -138,16 +138,16 @@
   <audio id="audio" crossorigin="anonymous"></audio>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
-  // ======= KONFIG (prefilled per your preference) =======
-  const API_PROXY = 'https://nyhet24-tokamak.workers.dev';
+  // ======= KONFIG: din Worker-proxy =======
+  const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev';
 
-  // ======= Helpers =======
+  // ======= Hjälp =======
   const $ = sel => document.querySelector(sel);
   const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
   const fmtTags = t => t ? (''+t).split(',').slice(0,3).map(s=>s.trim()).filter(Boolean) : [];
   const toast = (m)=>{ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1300); };
 
-  // ======= API via proxy =======
+  // ======= API via din proxy =======
   async function api(path){
     const url = API_PROXY + '?path=' + encodeURIComponent(path);
     const r = await fetch(url);
@@ -167,12 +167,13 @@
     const span = $('#tickerText');
     const msg = (text || '').trim() || '—';
     span.textContent = '   ' + msg + '   ';
+    // starta om CSS-animation
     span.classList.remove('tickerRun'); void span.offsetWidth; span.classList.add('tickerRun');
     bar.style.display = 'flex';
   }
   function hideTicker(){ $('#ticker').style.display='none'; }
 
-  // ======= Cards =======
+  // ======= Kort =======
   function stationCard(st){
     const card = el('div','card');
     const cover = el('div','station-cover');
@@ -225,7 +226,7 @@
     topIndex = end; $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
   }
 
-  // ======= Search & lists =======
+  // ======= Sök & listor =======
   async function search(q){
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none'; $('#btnMore').style.display='none';
     const query = (q||'').trim();
@@ -264,7 +265,7 @@
     renderTopChunk();
   }
 
-  // ======= Countries =======
+  // ======= Länder (dropdown) =======
   async function loadCountries(){
     try{
       const countries = await api('/json/countries?order=stationcount&reverse=true');
@@ -279,7 +280,7 @@
     }catch(e){ /* ignore */ }
   }
 
-  // ======= Player + Now Playing =======
+  // ======= Spelare + Now Playing =======
   const audio = $('#audio'); let hls; let npTimer=null; let currentStream='';
   $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); });
   $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; clearInterval(npTimer); hideTicker(); $('#playerName').textContent='—'; $('#playerDetails').textContent='—'; $('#playerBar').style.display='none'; updateButtons(); });
@@ -319,13 +320,13 @@
         const info = await now(currentStream);
         const line = info ? (info.artist && info.title ? `${info.artist} – ${info.title}` : (info.streamTitle || '—')) : '—';
         setTicker(line && line !== '—' ? line : ('Lyssnar på ' + (st.name || 'okänd station')));
-      }catch{ /* keep previous */ }
+      }catch{ /* behåll föregående */ }
     };
     await tick();
     npTimer = setInterval(tick, 15000);
   }
 
-  // ======= Favs + NP =======
+  // ======= Favoriter (+ Now Playing) =======
   const favKey = 'wr_favs_v1';
   const getFavs = () => { try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
   const setFavs = (x) => localStorage.setItem(favKey, JSON.stringify(x));
@@ -374,14 +375,14 @@
     favNpTimer = setInterval(tickFavs, 20000);
   }
 
-  // ======= Diagnostics =======
+  // ======= Diagnostik =======
   function showDiag(msg){ const d=$('#diag'); d.style.display='block'; d.textContent=msg; }
   $('#btnDiag').addEventListener('click', async ()=>{
     try{ const stats = await api('/json/stats'); showDiag('Proxy OK · stationer: ' + (stats.stations||'?')); }
     catch(err){ showDiag('Proxy FEL: ' + err.message); }
   });
 
-  // ======= Events =======
+  // ======= Händelser =======
   $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
   $('#btnTop').addEventListener('click', ()=> {
