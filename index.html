@@ -2,12 +2,17 @@
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
-  <!-- Ingen mobil-zoom -->
+  <!-- Disable zoom on mobile -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>World Radio — proxy-aktiverad</title>
   <meta name="description" content="Lyssna på radiostationer från hela världen. Sök via egen Cloudflare Worker-proxy. Spara favoriter.">
+  <!-- Digital font for ticker -->
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0b0c10;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--border:#222433}
+    :root{
+      --bg:#0b0c10;--panel:#12131a;--muted:#7a8194;--text:#e6e9f2;--accent:#4f46e5;--border:#222433;
+      --green:#b1ffd2; --player-h: 110px; --ticker-h: 34px;
+    }
     *{box-sizing:border-box}
     html,body{height:100%}
     html{ -webkit-text-size-adjust: 100%; }
@@ -15,6 +20,7 @@
       margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text);
       background:radial-gradient(1200px 600px at 15% -10%,#1c1d28 0,transparent 60%),radial-gradient(900px 450px at 110% 10%,#0f172a 0,transparent 55%),var(--bg);
       touch-action: manipulation;
+      padding-bottom: calc(var(--player-h) + var(--ticker-h) + 16px); /* so content isn't hidden behind fixed bars */
     }
     header{position:sticky;top:0;background:rgba(11,12,16,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
     .wrap{max-width:1100px;margin:0 auto;padding:14px 12px}
@@ -22,7 +28,7 @@
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
     .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.05));border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;gap:10px;align-items:flex-start}
     .card:hover{border-color:#2a2d40}
-    .station-cover{flex:0 0 auto;width:44px;height:44px;border-radius:10px;background:#0e0f15;border:1px solid var(--border);display:grid;place-items:center;overflow:hidden}
+    .station-cover{flex:0 0 auto;width:50px;height:50px;border-radius:12px;background:#0e0f15;border:1px solid var(--border);display:grid;place-items:center;overflow:hidden}
     .station-cover img{width:100%;height:100%;object-fit:cover}
     .muted{color:var(--muted)}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -35,21 +41,43 @@
     .btn{background:#10121a;border:1px solid var(--border);padding:9px 12px;border-radius:10px;color:var(--text);cursor:pointer;font-size:16px}
     .btn:hover{border-color:#2a2d40}
     .btn.primary{background:linear-gradient(180deg,#4f46e5,#4338ca);border:none}
-    .btn.small{padding:5px 8px;border-radius:8px}
+    .btn.small{padding:6px 9px;border-radius:8px}
     .btn.ghost{background:transparent;border:1px dashed #2a2d40}
     .h{margin:16px 0 8px;font-size:13px;color:#aab3d0;text-transform:uppercase;letter-spacing:.12em}
-    .audio{position:sticky;bottom:0;background:rgba(11,12,16,.92);backdrop-filter:blur(8px);border-top:1px solid var(--border);padding:6px 10px;display:flex;gap:8px;align-items:center}
-    .audio .meta{min-width:0}
-    .meta .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
-    .meta .muted{font-size:11px}
-    .audio-controls{display:flex;gap:6px;align-items:center;margin-left:auto}
-    .audio input[type="range"]{width:110px}
     .empty{opacity:.7;border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center}
     .diag{margin-top:8px;font-size:12px;color:#fbbf24}
-    .toast{position:fixed;right:12px;bottom:70px;background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
+    .toast{position:fixed;right:12px;bottom:calc(var(--player-h) + var(--ticker-h) + 12px);background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
     .more-wrap{display:flex;justify-content:center;margin:12px 0}
-    .now{font-size:12px;color:#b1ffd2;margin:2px 0}
+
+    /* Ticker (digital) */
+    .ticker{
+      position:fixed;left:0;right:0;bottom:var(--player-h);height:var(--ticker-h);
+      background:#0a1112;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+      display:none;align-items:center;overflow:hidden;z-index:20;
+    }
+    .tickerInner{
+      width:100%;white-space:nowrap;overflow:hidden;
+      font-family:'VT323', ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size:22px;line-height:1;color:var(--green);letter-spacing:0.02em;
+      text-shadow:0 0 6px rgba(177,255,210,.45);
+    }
+    .tickerRun{display:inline-block;padding-left:100%;will-change:transform;animation: ticker 20s linear infinite}
+    @keyframes ticker{ from{ transform:translateX(0);} to{ transform:translateX(-100%);} }
+
+    /* Player (bigger) */
+    .audio{
+      position:fixed;left:0;right:0;bottom:0;height:var(--player-h);
+      background:rgba(11,12,16,.94);backdrop-filter:blur(8px);border-top:1px solid var(--border);
+      display:flex;gap:12px;align-items:center;padding:10px 12px;z-index:21;
+    }
+    .audio .station-cover{width:64px;height:64px;border-radius:14px}
+    .audio .meta{min-width:0;display:flex;flex-direction:column;gap:4px}
+    .meta .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:18px;font-weight:700}
+    .meta .muted{font-size:12px}
+    .liveDot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 12px rgba(239,68,68,.8);margin-right:6px;display:inline-block;vertical-align:middle}
+    .audio-controls{display:flex;gap:8px;align-items:center;margin-left:auto}
+    .audio input[type="range"]{width:120px}
   </style>
 </head>
 <body>
@@ -86,11 +114,14 @@
     </section>
   </main>
 
+  <!-- Digital ticker bar just above the player -->
+  <div class="ticker" id="ticker"><div class="tickerInner"><span class="tickerRun" id="tickerText"></span></div></div>
+
+  <!-- Player -->
   <div class="audio" id="playerBar" style="display:none">
-    <div class="station-cover" id="playerCover" style="width:36px;height:36px;border-radius:8px"></div>
+    <div class="station-cover" id="playerCover"></div>
     <div class="meta">
-      <div class="name" id="playerName">—</div>
-      <div class="now" id="playerNow">—</div>
+      <div class="name"><span class="liveDot" id="liveDot" style="display:none"></span><span id="playerName">—</span></div>
       <div class="muted" id="playerDetails">—</div>
     </div>
     <div class="audio-controls">
@@ -107,16 +138,16 @@
   <audio id="audio" crossorigin="anonymous"></audio>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
-  // ======= KONFIG: byt till din Worker-URL =======
-  const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev'; // <-- BYT UT DENNA
+  // ======= KONFIG (prefilled per your preference) =======
+  const API_PROXY = 'https://nyhet24-tokamak.workers.dev';
 
-  // ======= Hjälp =======
+  // ======= Helpers =======
   const $ = sel => document.querySelector(sel);
   const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
   const fmtTags = t => t ? (''+t).split(',').slice(0,3).map(s=>s.trim()).filter(Boolean) : [];
   const toast = (m)=>{ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1300); };
 
-  // ======= API via din proxy =======
+  // ======= API via proxy =======
   async function api(path){
     const url = API_PROXY + '?path=' + encodeURIComponent(path);
     const r = await fetch(url);
@@ -130,7 +161,18 @@
     }catch{ return null; }
   }
 
-  // ======= UI-kort =======
+  // ======= Ticker =======
+  function setTicker(text){
+    const bar = $('#ticker');
+    const span = $('#tickerText');
+    const msg = (text || '').trim() || '—';
+    span.textContent = '   ' + msg + '   ';
+    span.classList.remove('tickerRun'); void span.offsetWidth; span.classList.add('tickerRun');
+    bar.style.display = 'flex';
+  }
+  function hideTicker(){ $('#ticker').style.display='none'; }
+
+  // ======= Cards =======
   function stationCard(st){
     const card = el('div','card');
     const cover = el('div','station-cover');
@@ -155,11 +197,11 @@
 
   function favCard(st){
     const card = el('div','card'); card.dataset.uuid = st.stationuuid;
-    const cover = el('div','station-cover'); cover.style.width='40px'; cover.style.height='40px'; cover.style.borderRadius='9px';
+    const cover = el('div','station-cover'); cover.style.width='44px'; cover.style.height='44px'; cover.style.borderRadius='10px';
     if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else { cover.innerHTML='📻'; }
     const body = el('div');
     const name = el('div'); name.textContent = st.name || 'Okänd station'; name.style.fontWeight='600'; name.className='name';
-    const nowEl = el('div','now'); nowEl.textContent='—'; nowEl.dataset.role='now';
+    const nowEl = el('div'); nowEl.className = 'muted'; nowEl.dataset.role='now'; nowEl.textContent='—';
     const meta = el('div','muted'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
     const rowBtns = el('div','row');
     const btnPlay = el('button','btn small'); btnPlay.textContent='Spela'; btnPlay.addEventListener('click',()=> playStation(st));
@@ -169,19 +211,10 @@
     body.append(name, nowEl, meta, rowBtns); card.append(cover, body); return card;
   }
 
-  // ======= Global state för Populärt (5 i taget) =======
+  // ======= Populärt (5 i taget) =======
   const TOP_CHUNK = 5;
-  let topCache = [];    // listan vi visar ifrån
-  let topIndex = 0;     // nästa index att rendera
-  let topKey = 'GLOBAL';// nyckel (GLOBAL eller landskod)
-
-  function resetTop(key){
-    topCache = [];
-    topIndex = 0;
-    topKey = key || 'GLOBAL';
-    $('#btnMore').style.display = 'none';
-  }
-
+  let topCache = []; let topIndex = 0; let topKey = 'GLOBAL';
+  function resetTop(key){ topCache = []; topIndex = 0; topKey = key || 'GLOBAL'; $('#btnMore').style.display = 'none'; }
   function renderTopChunk(){
     const end = Math.min(topIndex + TOP_CHUNK, topCache.length);
     const frag = document.createDocumentFragment();
@@ -189,46 +222,36 @@
     if(topIndex===0) $('#results').innerHTML='';
     $('#results').append(frag);
     $('#resultsEmpty').style.display = (topCache.length===0);
-    topIndex = end;
-    $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
+    topIndex = end; $('#btnMore').style.display = (topIndex < topCache.length) ? 'inline-flex' : 'none';
   }
 
-  // ======= Sök & listor =======
+  // ======= Search & lists =======
   async function search(q){
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none'; $('#btnMore').style.display='none';
     const query = (q||'').trim();
-    const cc = $('#country').value.trim(); // ISO2 eller tomt
-
+    const cc = $('#country').value.trim();
     if(!query && cc){ return listTop(cc); }
     if(!query){ return listTop('GLOBAL'); }
-
     const enc = encodeURIComponent(query);
     const tasks = [];
-    // Stations/search med ev. landfilter
     let base = `/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60&name=${enc}`;
     if(cc) base += `&countrycode=${encodeURIComponent(cc)}`;
     tasks.push(api(base));
-    // kompletterande
     tasks.push(api(`/json/stations/byname/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
     tasks.push(api(`/json/stations/bytag/${enc}?hidebroken=true&order=clickcount&reverse=true&limit=60`));
-
     const settled = await Promise.allSettled(tasks);
     const results = settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
     const seen = new Set(); const uniq = [];
     for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
-
     if(!uniq.length){ $('#resultsEmpty').style.display='block'; return; }
     const frag = document.createDocumentFragment(); uniq.slice(0,60).forEach(st=> frag.append(stationCard(st))); $('#results').append(frag);
   }
 
   async function listTop(scope){
-    // scope: 'GLOBAL' eller ISO-landskod (SE, US, ...)
     const isCountry = scope && scope !== 'GLOBAL';
     const key = isCountry ? `TOP_${scope}` : 'GLOBAL';
-
     if(topKey !== key) resetTop(key);
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
-
     if(topCache.length === 0){
       let list = [];
       if(isCountry){
@@ -238,10 +261,10 @@
       }
       topCache = Array.isArray(list) ? list : [];
     }
-    renderTopChunk(); // 5 första
+    renderTopChunk();
   }
 
-  // ======= Länder (dropdown) =======
+  // ======= Countries =======
   async function loadCountries(){
     try{
       const countries = await api('/json/countries?order=stationcount&reverse=true');
@@ -256,13 +279,13 @@
     }catch(e){ /* ignore */ }
   }
 
-  // ======= Spelare + Now Playing =======
+  // ======= Player + Now Playing =======
   const audio = $('#audio'); let hls; let npTimer=null; let currentStream='';
   $('#btnPausePlay').addEventListener('click',()=>{ if(audio.paused){ audio.play(); } else { audio.pause(); } updateButtons(); });
-  $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; clearInterval(npTimer); $('#playerNow').textContent='—'; updateButtons(); });
+  $('#btnStop').addEventListener('click',()=>{ if(hls){ hls.destroy(); hls=null; } audio.pause(); audio.src=''; clearInterval(npTimer); hideTicker(); $('#playerName').textContent='—'; $('#playerDetails').textContent='—'; $('#playerBar').style.display='none'; updateButtons(); });
   $('#btnMute').addEventListener('click',()=>{ audio.muted = !audio.muted; updateButtons(); });
   $('#vol').addEventListener('input', e=>{ audio.volume = +e.target.value; });
-  function updateButtons(){ $('#btnPausePlay').textContent = audio.paused ? '▶' : '⏸'; $('#btnMute').textContent = audio.muted ? '🔇' : '🔊'; }
+  function updateButtons(){ $('#btnPausePlay').textContent = audio.paused ? '▶' : '⏸'; $('#btnMute').textContent = audio.muted ? '🔇' : '🔊'; $('#liveDot').style.display = audio.paused ? 'none' : 'inline-block'; }
 
   async function playStation(st){
     let streamUrl = st.url_resolved || st.url;
@@ -288,20 +311,21 @@
     const home=$('#btnHome'); home.href = st.homepage||'#';
     updateButtons();
 
-    // Now Playing (15s)
+    setTicker('Lyssnar på ' + (st.name || 'okänd station'));
+
     clearInterval(npTimer);
     const tick = async () => {
       try{
         const info = await now(currentStream);
         const line = info ? (info.artist && info.title ? `${info.artist} – ${info.title}` : (info.streamTitle || '—')) : '—';
-        $('#playerNow').textContent = line || '—';
-      }catch{ $('#playerNow').textContent = '—'; }
+        setTicker(line && line !== '—' ? line : ('Lyssnar på ' + (st.name || 'okänd station')));
+      }catch{ /* keep previous */ }
     };
     await tick();
     npTimer = setInterval(tick, 15000);
   }
 
-  // ======= Favoriter (+ Now Playing) =======
+  // ======= Favs + NP =======
   const favKey = 'wr_favs_v1';
   const getFavs = () => { try{ return JSON.parse(localStorage.getItem(favKey)||'[]'); }catch{ return []; } };
   const setFavs = (x) => localStorage.setItem(favKey, JSON.stringify(x));
@@ -325,7 +349,6 @@
     favs.forEach(f=>{ const s = map.get(f.uuid) || f.snap; if(!s) return; frag.append(favCard(s)); });
     $('#favs').append(frag);
 
-    // Now Playing för favoriter (20s)
     clearInterval(favNpTimer);
     const tickFavs = async ()=>{
       const cards = Array.from(document.querySelectorAll('#favs .card'));
@@ -351,14 +374,14 @@
     favNpTimer = setInterval(tickFavs, 20000);
   }
 
-  // ======= Diagnostik =======
+  // ======= Diagnostics =======
   function showDiag(msg){ const d=$('#diag'); d.style.display='block'; d.textContent=msg; }
   $('#btnDiag').addEventListener('click', async ()=>{
     try{ const stats = await api('/json/stats'); showDiag('Proxy OK · stationer: ' + (stats.stations||'?')); }
     catch(err){ showDiag('Proxy FEL: ' + err.message); }
   });
 
-  // ======= Händelser =======
+  // ======= Events =======
   $('#btnSearch').addEventListener('click', ()=> { const v = $('#q').value.trim(); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
   $('#btnTop').addEventListener('click', ()=> {
