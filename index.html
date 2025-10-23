@@ -36,7 +36,7 @@
     .pill{font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
     .controls{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:8px}
 
-    /* Digital stil */
+    /* Digital/retro stil */
     .digital{ font-family:'VT323',ui-monospace,Consolas,monospace; letter-spacing:.03em; color:var(--green); text-shadow:0 0 6px rgba(177,255,210,.45); }
     .btn{
       background:#0c0e13;border:1px solid #2a2d40;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:18px;
@@ -66,30 +66,34 @@
     .tickerInner .digital{ font-size:22px;line-height:1;display:inline-block;padding-left:100%; animation:ticker 20s linear infinite; }
     @keyframes ticker{ from{ transform:translateX(0);} to{ transform:translateX(-100%);} }
 
-    /* Spelare – högre + alltid tight mot botten */
+    /* ===================== Spelare ===================== */
     .audio{
       position:fixed;left:0;right:0;bottom:0;
       height:calc(var(--player-h) + env(safe-area-inset-bottom));
       background:#000; border-top:1px solid var(--border);
-      display:flex;gap:12px;align-items:center;padding:12px;
-      padding-bottom:calc(12px + env(safe-area-inset-bottom));
+      padding:12px; padding-bottom:calc(12px + env(safe-area-inset-bottom));
       z-index:21;
+      display:block;
     }
-    .audio .station-cover{width:72px;height:72px;border-radius:14px}
+    /* Inre grid – styr layouten */
+    .player-grid{
+      display:flex; align-items:center; gap:12px;
+      max-width:1100px; margin:0 auto;
+    }
+    .audio .station-cover{width:72px;height:72px;border-radius:14px; flex:0 0 auto}
     .audio .meta{min-width:0;display:flex;flex-direction:column;gap:6px;flex:1}
-    /* Se till att text alltid är horisontell (iOS/line-clamp quirks) */
-    .audio .meta, .meta .name, #playerName, #playerDetails{
-      writing-mode: horizontal-tb !important;
-      text-orientation: mixed;
-      white-space: normal;
-    }
     .meta .name{font-size:22px}
-    /* 2 rader desktop */
-    .meta .name span#playerName{
-      display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+    /* Stabil textwrap utan line-clamp-buggar */
+    #playerName{
+      display:block; line-height:1.25; max-height: calc(1.25em * 2); /* 2 rader desktop */
+      overflow:hidden;
+      white-space:normal;
     }
-    .meta .muted{font-size:13px}
+    #playerDetails{ font-size:13px; white-space:normal; }
+
     .liveDot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 12px rgba(239,68,68,.8);margin-right:6px;display:inline-block;vertical-align:middle}
+
+    /* Knappar – desktop: i samma rad */
     .audio-controls{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
 
     /* SVG-ikoner */
@@ -116,23 +120,23 @@
     .vol-slider::-moz-range-track{ background:#0c1320; border:1px solid #2a2d40; }
     .vol-slider::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--green); box-shadow:0 0 10px rgba(177,255,210,.55); }
 
-    /* Mobil: högre spelare + text ovanför knappar (grid areas) + 3 rader namn */
+    /* ===== Mobil: text ALLTID ovanför knapparna ===== */
     @media (max-width: 720px){
       :root{ --player-h: 170px; }
-      .audio{
+      .player-grid{
         display:grid;
         grid-template-columns: 84px 1fr;
         grid-template-areas:
           "cover meta"
           "controls controls";
-        grid-auto-rows: auto;
-        align-items:start;
         gap:10px 12px;
+        align-items:start;
       }
       #playerCover{ grid-area: cover; }
       .audio .meta{ grid-area: meta; }
       .audio-controls{ grid-area: controls; margin-left:0; justify-content:space-between; }
-      .meta .name span#playerName{ -webkit-line-clamp: 3; }  /* 3 rader på mobil */
+      /* 3 rader för namn på mobil, utan line-clamp */
+      #playerName{ max-height: calc(1.25em * 3); }
     }
 
     /* Favoriter-vy */
@@ -204,32 +208,27 @@
 
   <!-- Spelare -->
   <div class="audio" id="playerBar" style="display:none">
-    <div class="station-cover" id="playerCover"></div>
-    <div class="meta">
-      <div class="name digital"><span class="liveDot" id="liveDot" style="display:none"></span><span id="playerName">—</span></div>
-      <div class="muted digital" id="playerDetails">—</div>
-    </div>
-    <div class="audio-controls">
-      <button class="btn small iconbtn" id="btnStop" title="Stoppa" aria-label="Stoppa">
-        <svg class="ico"><use href="#ico-stop"/></svg>
-      </button>
-      <button class="btn small iconbtn" id="btnPausePlay" title="Spela/Pausa" aria-label="Spela/Pausa">
-        <svg class="ico" id="icoPlayPause"><use href="#ico-play"/></svg>
-      </button>
-      <button class="btn small iconbtn" id="btnMute" title="Ljud av/på" aria-label="Ljud av/på">
-        <svg class="ico" id="icoMute"><use href="#ico-volume"/></svg>
-      </button>
-      <div class="vol-wrap">
-        <button class="btn small iconbtn" id="btnVol" title="Volym" aria-haspopup="true" aria-expanded="false">
-          <svg class="ico"><use href="#ico-volume"/></svg>
-        </button>
-        <div class="vol-pop" id="volPop">
-          <input id="volSlider" class="vol-slider" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volym (vertikal)"/>
+    <div class="player-grid">
+      <div class="station-cover" id="playerCover"></div>
+      <div class="meta">
+        <div class="name digital">
+          <span class="liveDot" id="liveDot" style="display:none"></span>
+          <span id="playerName">—</span>
         </div>
+        <div class="muted digital" id="playerDetails">—</div>
       </div>
-      <a class="btn small iconbtn" id="btnHome" target="_blank" rel="noopener" title="Öppna stationens webbplats" aria-label="Öppna stationens webbplats">
-        <svg class="ico"><use href="#ico-globe"/></svg>
-      </a>
+      <div class="audio-controls">
+        <button class="btn small iconbtn" id="btnStop" title="Stoppa" aria-label="Stoppa"><svg class="ico"><use href="#ico-stop"/></svg></button>
+        <button class="btn small iconbtn" id="btnPausePlay" title="Spela/Pausa" aria-label="Spela/Pausa"><svg class="ico" id="icoPlayPause"><use href="#ico-play"/></svg></button>
+        <button class="btn small iconbtn" id="btnMute" title="Ljud av/på" aria-label="Ljud av/på"><svg class="ico" id="icoMute"><use href="#ico-volume"/></svg></button>
+        <div class="vol-wrap">
+          <button class="btn small iconbtn" id="btnVol" title="Volym" aria-haspopup="true" aria-expanded="false"><svg class="ico"><use href="#ico-volume"/></svg></button>
+          <div class="vol-pop" id="volPop">
+            <input id="volSlider" class="vol-slider" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volym (vertikal)"/>
+          </div>
+        </div>
+        <a class="btn small iconbtn" id="btnHome" target="_blank" rel="noopener" title="Öppna stationens webbplats" aria-label="Öppna stationens webbplats"><svg class="ico"><use href="#ico-globe"/></svg></a>
+      </div>
     </div>
   </div>
 
@@ -366,7 +365,7 @@
     audio.src=''; if(isHls && window.Hls?.isSupported()){ hls=new Hls({maxBufferLength:20}); hls.loadSource(streamUrl); hls.attachMedia(audio); } else { audio.src=streamUrl; }
     audio.play();
 
-    $('#playerBar').style.display='flex';
+    $('#playerBar').style.display='block';
     $('#playerName').textContent=st.name||'Okänd';
     $('#playerDetails').textContent=[st.countrycode, st.codec?(st.codec+(st.bitrate?` ${st.bitrate}kbps`:'')):null].filter(Boolean).join(' · ');
     const cov=$('#playerCover'); cov.innerHTML=''; if(st.favicon){ const img=new Image(); img.src=st.favicon; cov.append(img);} else { cov.textContent='📻'; }
