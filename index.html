@@ -230,9 +230,10 @@
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
   <script>
   const API_PROXY = 'https://wradio-proxy.nyhet24-tokamak.workers.dev';
+
   const $ = sel => document.querySelector(sel);
   const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
-  const fmtTags = t => t ? (''+t).split(',').slice(0,3).map(s=>s.trim()).filter(Boolean) : [];
+  const fmtTags = t => t ? (''+t).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6) : []; // upp till 6 taggar vid visning
   const toast = (m)=>{ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
 
   async function api(path){ const r=await fetch(API_PROXY+'?path='+encodeURIComponent(path)); if(!r.ok) throw new Error('API '+r.status); return r.json(); }
@@ -267,15 +268,19 @@
 
     const name=el('div','digital'); name.style.fontSize='20px'; name.textContent=st.name||'Okänd station';
 
-    // META (språk/land/codec) – DOLT från start
-    const meta=el('div','muted digital'); const parts=[];
-    if(st.countrycode) parts.push(st.countrycode);
-    if(st.language) parts.push((''+st.language).split(',')[0]);
-    if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')); 
-    meta.textContent=parts.join(' · ');
-    meta.hidden = true;
+    // META (land/språk/kvalitet) – ALLTID synlig
+    const meta=el('div','muted digital');
+    const metaParts=[];
+    if(st.countrycode) metaParts.push(st.countrycode);
+    if(st.language) metaParts.push((''+st.language).split(',')[0]);
+    if(st.codec) metaParts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')); 
+    meta.textContent=metaParts.join(' · ');
 
-    const tags=el('div','row'); fmtTags(st.tags).forEach(tag=>{ const p=el('span','pill digital'); p.textContent=tag; tags.append(p); });
+    // TAGGAR – DOLDA tills man klickar på kortet
+    const tagsWrap=el('div','row'); 
+    const tagsList=fmtTags(st.tags);
+    if(tagsList.length){ tagsList.forEach(tag=>{ const p=el('span','pill digital'); p.textContent=tag; tagsWrap.append(p); }); }
+    tagsWrap.hidden = true;
 
     const controls=el('div','controls clickIgnore');
     const btnPlay=el('button','btn primary digital'); btnPlay.textContent='SPELA';
@@ -286,11 +291,11 @@
     btnFav.addEventListener('click',(e)=>{ e.stopPropagation(); toggleFav(st,btnFav); });
     btnHome.addEventListener('click',(e)=>{ e.stopPropagation(); });
 
-    // Klick på kortet växlar META
-    card.addEventListener('click', ()=> { meta.hidden = !meta.hidden; });
+    // Klick på kortet växlar TAGGAR (inte meta)
+    card.addEventListener('click', ()=> { tagsWrap.hidden = !tagsWrap.hidden; });
 
     controls.append(btnPlay, btnFav, btnHome);
-    body.append(name, meta, tags, controls);
+    body.append(name, meta, tagsWrap, controls);
     card.append(cover, body);
     return card;
   }
@@ -304,7 +309,12 @@
     nowEl.title = 'Klicka för att kopiera';
     nowEl.addEventListener('click',(e)=>{ e.stopPropagation(); copyToClipboard(nowEl.textContent.trim()); });
 
-    const meta=el('div','muted digital'); const parts=[]; if(st.countrycode) parts.push(st.countrycode); if(st.language) parts.push((''+st.language).split(',')[0]); meta.textContent=parts.join(' · ');
+    const meta=el('div','muted digital');
+    const parts=[]; if(st.countrycode) parts.push(st.countrycode);
+    if(st.language) parts.push((''+st.language).split(',')[0]);
+    if(st.codec) parts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')); 
+    meta.textContent=parts.join(' · ');
+
     const rowBtns=el('div','row clickIgnore');
     const btnPlay=el('button','btn small digital'); btnPlay.textContent='SPELA'; btnPlay.addEventListener('click',(e)=>{ e.stopPropagation(); playStation(st); });
     const btnRm=el('button','btn small digital'); btnRm.textContent='TA BORT'; btnRm.addEventListener('click',(e)=>{ e.stopPropagation(); removeFav(st.stationuuid); });
@@ -379,7 +389,7 @@
   }
 
   /* Spelare + now playing */
-  const audio = document.getElementById('audio'); /* <-- EN enda deklaration (fix) */
+  const audio = document.getElementById('audio'); /* EN enda deklaration */
   let hls; let npTimer=null; let currentStream=''; let currentStation=null;
   const volPop=$('#volPop'); const volBtn=$('#btnVol'); const volSlider=$('#volSlider'); const VOL_KEY='wr_vol';
   const icoPlayPause=$('#icoPlayPause use'); const icoMute=$('#icoMute use');
