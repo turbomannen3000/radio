@@ -19,13 +19,14 @@
       background:#000; touch-action: manipulation;
       padding-bottom: calc(var(--ticker-h) + var(--player-h) + env(safe-area-inset-bottom) + 20px);
     }
+    a { text-decoration:none; color:inherit; border-bottom:0; }
     header{position:sticky;top:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);z-index:10;border-bottom:1px solid var(--border)}
     .wrap{max-width:1100px;margin:0 auto;padding:14px 12px}
     .title{display:flex;gap:8px;align-items:center;font-weight:700}
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
     .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.05));border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;gap:10px;align-items:flex-start;cursor:pointer}
     .card:hover{border-color:#2a2d40}
-    .card .clickIgnore{ cursor: default; }
+    .card .clickIgnore{ cursor: default; } /* knappar ska inte trigga kort-klick */
     .station-cover{flex:0 0 auto;width:50px;height:50px;border-radius:12px;background:#0e0f15;border:1px solid var(--border);display:grid;place-items:center;overflow:hidden}
     .station-cover img{width:100%;height:100%;object-fit:cover}
     .muted{color:var(--muted)}
@@ -36,10 +37,12 @@
     }
     .pill{font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
 
+    /* === Jämnstora knappar på korten === */
     .controls{ display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px }
     .controls .btn{width:100%;height:44px;display:flex;align-items:center;justify-content:center}
     .controls .iconbtn .ico{width:18px;height:18px}
 
+    /* Digital/retro stil */
     .digital{ font-family:'VT323',ui-monospace,Consolas,monospace; letter-spacing:.03em; color:var(--green); text-shadow:0 0 6px rgba(177,255,210,.45); }
     .btn{
       background:#0c0e13;border:1px solid #2a2d40;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:18px;
@@ -50,7 +53,7 @@
     .btn.small{padding:6px 9px;border-radius:8px}
     .btn.ghost{background:transparent;border:1px dashed #2a2d40}
     .btn:link,.btn:visited{ text-decoration:none }
-    .iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;line-height:1;text-decoration:none}
+    .iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;line-height:1;text-decoration:none;border-bottom:0}
     .h{margin:16px 0 8px;font-size:13px;color:#aab3d0;text-transform:uppercase;letter-spacing:.12em}
     .empty{opacity:.7;border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center}
     .diag{margin-top:8px;font-size:12px;color:#fbbf24}
@@ -61,6 +64,7 @@
     .tags{ display:none; }
     .card.show-tags .tags{ display:flex; }
 
+    /* Ticker (kopieringsbar) */
     .ticker{
       position:fixed;left:0;right:0;bottom:calc(var(--player-h) + env(safe-area-inset-bottom));
       height:var(--ticker-h); background:#0a1112;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
@@ -70,6 +74,7 @@
     .tickerInner .digital{ font-size:22px;line-height:1;display:inline-block;padding-left:100%; animation:ticker 20s linear infinite; }
     @keyframes ticker{ from{ transform:translateX(0);} to{ transform:translateX(-100%);} }
 
+    /* ===================== Spelare (mobil-först) ===================== */
     .audio{
       position:fixed;left:0;right:0;bottom:0;
       height:calc(var(--player-h) + env(safe-area-inset-bottom));
@@ -90,6 +95,7 @@
          filter:drop-shadow(0 0 6px rgba(177,255,210,.45));}
     .ico-fill{ fill:var(--green); stroke:none; filter:drop-shadow(0 0 6px rgba(177,255,210,.45)); }
 
+    /* Volym-popover */
     .vol-wrap{position:relative}
     .vol-pop{
       position:absolute; right:0; bottom:calc(100% + 10px);
@@ -108,6 +114,7 @@
     .vol-slider::-moz-range-track{ background:#0c1320; border:1px solid #2a2d40; }
     .vol-slider::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--green); box-shadow:0 0 10px rgba(177,255,210,.55); }
 
+    /* Mobil: text ovanför knappar (grid areas) + 3 rader namn */
     @media (max-width: 720px){
       :root{ --player-h: 170px; }
       .player-grid{
@@ -125,11 +132,13 @@
       #playerName{ max-height: calc(1.25em * 3); }
     }
 
+    /* Favoriter-vy */
     body.mode-favs #resultsSection{display:none}
     body.mode-favs #favsSection{display:block}
 
     .copyable{ cursor: pointer; }
 
+    /* Sentinel (oändlig scroll) */
     #sentinel{ height: 1px; }
   </style>
 </head>
@@ -155,7 +164,7 @@
         <path d="M12 3 a9 9 0 0 1 0 18 a9 9 0 0 1 0 -18 z" fill="none"></path>
         <path d="M12 3 c3 3 3 15 0 18 c-3 -3 -3 -15 0 -18 z"></path>
       </symbol>
-      <!-- Spotify-ikon (enkel vektor) -->
+      <!-- Spotify-ikon -->
       <symbol id="ico-spotify" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="10"></circle>
         <path d="M7 9.5 q5 -1.5 10 1" stroke-width="1.6" fill="none"></path>
@@ -197,6 +206,7 @@
     </section>
   </main>
 
+  <!-- Ticker (klicka för kopiering) -->
   <div class="ticker" id="ticker"><div class="tickerInner"><span class="digital" id="tickerText"></span></div></div>
 
   <!-- Spelare -->
@@ -220,8 +230,8 @@
             <input id="volSlider" class="vol-slider" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volym (vertikal)"/>
           </div>
         </div>
-        <!-- NY: Spotify-knapp -->
-        <a class="btn small iconbtn" id="btnSpotify" title="Öppna i Spotify" aria-label="Öppna i Spotify"><svg class="ico"><use href="#ico-spotify"/></svg></a>
+        <!-- Spotify-knapp -->
+        <a class="btn small iconbtn" id="btnSpotify" href="#" title="Öppna i Spotify" aria-label="Öppna i Spotify"><svg class="ico"><use href="#ico-spotify"/></svg></a>
         <a class="btn small iconbtn" id="btnHome" target="_blank" rel="noopener" title="Öppna stationens webbplats" aria-label="Öppna stationens webbplats"><svg class="ico"><use href="#ico-globe"/></svg></a>
       </div>
     </div>
@@ -236,6 +246,10 @@
 
   const $ = sel => document.querySelector(sel);
   const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
+
+  /* Plattformdetektion för deeplinks */
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
 
   // ÅÄÖ-fix (mojibake -> UTF-8)
   function fixMojibake(s){
@@ -257,6 +271,7 @@
   async function api(path){ const r=await fetch(API_PROXY+'?path='+encodeURIComponent(path)); if(!r.ok) throw new Error('API '+r.status); return r.json(); }
   async function now(streamUrl){ try{ const r=await fetch(API_PROXY+'?now=1&stream='+encodeURIComponent(streamUrl)); if(!r.ok) throw 0; return r.json(); }catch{ return null; } }
 
+  // Kopiera till urklipp
   async function copyToClipboard(text){
     if(!text) return;
     try{ await navigator.clipboard.writeText(text); toast('Kopierat'); }
@@ -266,6 +281,7 @@
     }
   }
 
+  // Ticker
   function setTicker(text){
     const span=$('#tickerText'); const msg=fixMojibake((text||'').trim())||'—';
     span.textContent='   '+msg+'   '; span.style.animation='none'; void span.offsetWidth; span.style.animation=''; $('#ticker').style.display='flex';
@@ -276,6 +292,7 @@
     if(t && t !== '—') copyToClipboard(t);
   });
 
+  // Station-kort
   function stationCard(st){
     const card=el('div','card');
     const cover=el('div','station-cover'); if(st.favicon){ const img=new Image(); img.src=st.favicon; cover.append(img);} else cover.innerHTML='📻';
@@ -283,6 +300,7 @@
 
     const name=el('div','digital'); name.style.fontSize='20px'; name.textContent=st.name||'Okänd station';
 
+    // META – ALLTID synlig (land · språk · kvalitet)
     const meta=el('div','muted digital');
     const metaParts=[];
     if(st.countrycode) metaParts.push(st.countrycode);
@@ -290,6 +308,7 @@
     if(st.codec) metaParts.push(st.codec + (st.bitrate?` ${st.bitrate}kbps`:'')); 
     meta.textContent=metaParts.join(' · ');
 
+    // TAGGAR – DOLDA tills klick
     const tagsWrap=el('div','tags row');
     const tagsList=fmtTags(st.tags);
     if(tagsList.length){ tagsList.forEach(tag=>{ const p=el('span','pill digital'); p.textContent=tag; tagsWrap.append(p); }); }
@@ -303,6 +322,7 @@
     btnFav.addEventListener('click',(e)=>{ e.stopPropagation(); toggleFav(st,btnFav); });
     btnHome.addEventListener('click',(e)=>{ e.stopPropagation(); });
 
+    // Klick på kortet växlar TAGGAR
     card.addEventListener('click', ()=> { card.classList.toggle('show-tags'); });
 
     controls.append(btnPlay, btnFav, btnHome);
@@ -364,6 +384,7 @@
     if(topIndex >= topCache.length){ detachIO(); }
   }
 
+  /* Sök & listor */
   async function search(q){
     detachIO();
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
@@ -397,6 +418,7 @@
     attachIO();
   }
 
+  /* Länder – alfabetisk sortering */
   async function loadCountries(){
     try{
       const countries=await api('/json/countries?order=stationcount&reverse=true');
@@ -414,6 +436,7 @@
     }catch{}
   }
 
+  /* Media Session (iOS låsskärm) */
   function setMediaSession(st, info){
     if(!('mediaSession' in navigator)) return;
     const p=parseNP(info);
@@ -461,23 +484,40 @@
 
   let lastNP=null;
 
-  // NY: Öppna i Spotify baserat på "nu spelas"
+  /* Spotify: öppna appen direkt på iOS/Android, fallback till webbsök */
   function openSpotifyFromNowPlaying(){
     let q='';
-    const p=parseNP(lastNP||{});
-    const artist = fixMojibake(p.artist||'');
-    const title  = fixMojibake(p.title||'');
-    if(artist && title) q = `${artist} ${title}`;
+    const p = parseNP(lastNP || {});
+    const artist = fixMojibake(p.artist || '');
+    const title  = fixMojibake(p.title  || '');
+    if (artist && title) q = `${artist} ${title}`;
     else if (p.streamTitle) q = fixMojibake(p.streamTitle);
-    else q = ($('#playerName').textContent||'').trim();
+    else q = ($('#playerName').textContent || '').trim();
+
     q = q.replace(/\s+/g,' ').trim();
-    if(!q){ toast('Ingen låt upptäckt ännu'); return; }
-    // Web-sökning på Spotify (stabilt, funkar utan inlogg/nyckel)
-    const web = `https://open.spotify.com/search/${encodeURIComponent(q)}?type=tracks`;
-    try{ window.open(web,'_blank','noopener'); }
-    catch{ location.href = web; }
+    if (!q) { toast('Ingen låt upptäckt ännu'); return; }
+
+    const enc = encodeURIComponent(q);
+    const web = `https://open.spotify.com/search/${enc}?type=tracks`;
+
+    if (isIOS) {
+      setTimeout(()=>{ window.location.href = `spotify://search/${enc}`; }, 0);
+      setTimeout(()=>{ window.location.href = `spotify:search:${enc}`; }, 700);
+      setTimeout(()=>{ window.location.href = web; }, 1500);
+      return;
+    }
+    if (isAndroid) {
+      setTimeout(()=>{ window.location.href = `spotify://search/${enc}`; }, 0);
+      setTimeout(()=>{ window.location.href = web; }, 1200);
+      return;
+    }
+    try { window.open(web, '_blank', 'noopener'); }
+    catch { location.href = web; }
   }
-  $('#btnSpotify').addEventListener('click',(e)=>{ e.preventDefault(); openSpotifyFromNowPlaying(); });
+  document.getElementById('btnSpotify').addEventListener('click', (e)=>{
+    e.preventDefault();
+    openSpotifyFromNowPlaying();
+  });
 
   async function playStation(st){
     currentStation=st;
@@ -550,15 +590,18 @@
     await tickFavs(); favNpTimer=setInterval(tickFavs,20000);
   }
 
+  /* Diagnostik */
   function showDiag(msg){ const d=$('#diag'); d.style.display='block'; d.textContent=msg; d.classList.add('digital'); }
   $('#btnDiag').addEventListener('click', async ()=>{ try{ const stats=await api('/json/stats'); showDiag('PROXY OK · STATIONER: '+(stats.stations||'?')); } catch(err){ showDiag('PROXY FEL: '+err.message); } });
 
+  /* Händelser */
   $('#btnSearch').addEventListener('click', ()=>{ const v=$('#q').value.trim(); document.body.classList.remove('mode-favs'); search(v); });
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
   $('#btnTop').addEventListener('click', ()=>{ document.body.classList.remove('mode-favs'); const cc=$('#country').value.trim(); listTop(cc||'GLOBAL'); window.scrollTo({top:0,behavior:'smooth'}); });
   $('#btnFavs').addEventListener('click', ()=>{ document.body.classList.add('mode-favs'); document.querySelector('#favsSection').scrollIntoView({behavior:'smooth'}); });
   $('#country').addEventListener('change', ()=>{ const q=$('#q').value.trim(); document.body.classList.remove('mode-favs'); if(q) search(q); else listTop($('#country').value.trim()||'GLOBAL'); });
 
+  /* Init */
   (async function init(){
     await loadCountries();
     try{ await listTop('GLOBAL'); }catch(e){ $('#resultsEmpty').style.display='block'; showDiag('INITFEL: '+e.message); }
