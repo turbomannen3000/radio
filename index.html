@@ -58,7 +58,9 @@
     .toast{position:fixed;right:12px;bottom:calc(var(--ticker-h) + var(--player-h) + env(safe-area-inset-bottom) + 12px);background:#1b1d29;color:#e6e9f2;border:1px solid #2a2d40;padding:7px 9px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(6px);transition:.18s}
     .toast.show{opacity:1;transform:none}
 
-    .more-wrap{display:flex;justify-content:center;margin:16px 0 24px}
+    /* Taggar visas bara när kortet har klassen .show-tags */
+    .tags{ display:none; }
+    .card.show-tags .tags{ display:flex; }
 
     /* Ticker (kopieringsbar) */
     .ticker{
@@ -132,8 +134,10 @@
     body.mode-favs #resultsSection{display:none}
     body.mode-favs #favsSection{display:block}
 
-    /* Kopieringsbar text (favoriter “nu spelas”) */
     .copyable{ cursor: pointer; }
+
+    /* Sentinel (oändlig scroll) */
+    #sentinel{ height: 1px; }
   </style>
 </head>
 <body>
@@ -183,9 +187,8 @@
       <h2 class="h">Resultat</h2>
       <div id="results" class="grid"></div>
       <div id="resultsEmpty" class="empty digital" style="display:none">— INGA TRÄFFAR —</div>
-      <div class="more-wrap">
-        <button class="btn ghost digital" id="btnMore" style="display:none">VISA MER</button>
-      </div>
+      <!-- ingen Visa mer-knapp längre -->
+      <div id="sentinel"></div>
     </section>
 
     <section id="favsSection" class="nopad" style="display:block">
@@ -233,7 +236,22 @@
 
   const $ = sel => document.querySelector(sel);
   const el = (tag, cls) => { const e=document.createElement(tag); if(cls) e.className=cls; return e; };
-  const fmtTags = t => t ? (''+t).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6) : []; // upp till 6 taggar vid visning
+
+  // ÅÄÖ-fix (mojibake -> UTF-8)
+  function fixMojibake(s){
+    if(!s) return s;
+    if(/[ÃÂ�]/.test(s)){ // heuristik: tecken som ofta uppstår vid felkodning
+      try{
+        const bytes = Uint8Array.from(s.split('').map(ch=>ch.charCodeAt(0) & 0xFF));
+        const decoded = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+        if(decoded) return decoded;
+      }catch{}
+      try{ return decodeURIComponent(escape(s)); }catch{}
+    }
+    return s;
+  }
+
+  function fmtTags(t){ return t ? (''+t).split(',').map(s=>s.trim()).filter(Boolean).slice(0,10) : []; } // upp till 10 taggar (visas först vid klick)
   const toast = (m)=>{ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
 
   async function api(path){ const r=await fetch(API_PROXY+'?path='+encodeURIComponent(path)); if(!r.ok) throw new Error('API '+r.status); return r.json(); }
@@ -251,7 +269,7 @@
 
   // Ticker
   function setTicker(text){
-    const span=$('#tickerText'); const msg=(text||'').trim()||'—';
+    const span=$('#tickerText'); const msg=fixMojibake((text||'').trim())||'—';
     span.textContent='   '+msg+'   '; span.style.animation='none'; void span.offsetWidth; span.style.animation=''; $('#ticker').style.display='flex';
   }
   function hideTicker(){ $('#ticker').style.display='none'; }
@@ -277,10 +295,9 @@
     meta.textContent=metaParts.join(' · ');
 
     // TAGGAR – DOLDA tills man klickar på kortet
-    const tagsWrap=el('div','row'); 
+    const tagsWrap=el('div','tags row');
     const tagsList=fmtTags(st.tags);
     if(tagsList.length){ tagsList.forEach(tag=>{ const p=el('span','pill digital'); p.textContent=tag; tagsWrap.append(p); }); }
-    tagsWrap.hidden = true;
 
     const controls=el('div','controls clickIgnore');
     const btnPlay=el('button','btn primary digital'); btnPlay.textContent='SPELA';
@@ -291,8 +308,8 @@
     btnFav.addEventListener('click',(e)=>{ e.stopPropagation(); toggleFav(st,btnFav); });
     btnHome.addEventListener('click',(e)=>{ e.stopPropagation(); });
 
-    // Klick på kortet växlar TAGGAR (inte meta)
-    card.addEventListener('click', ()=> { tagsWrap.hidden = !tagsWrap.hidden; });
+    // Klick på kortet växlar TAGGAR (via klass)
+    card.addEventListener('click', ()=> { card.classList.toggle('show-tags'); });
 
     controls.append(btnPlay, btnFav, btnHome);
     body.append(name, meta, tagsWrap, controls);
@@ -324,14 +341,43 @@
     body.append(name,nowEl,meta,rowBtns); card.append(cover,body); return card;
   }
 
-  /* Populärt (5 i taget) */
-  const TOP_CHUNK=5; let topCache=[]; let topIndex=0; let topKey='GLOBAL';
-  function resetTop(key){ topCache=[]; topIndex=0; topKey=key||'GLOBAL'; $('#btnMore').style.display='none'; }
-  function renderTopChunk(){ const end=Math.min(topIndex+TOP_CHUNK,topCache.length); const frag=document.createDocumentFragment(); for(let i=topIndex;i<end;i++){ frag.append(stationCard(topCache[i])); } if(topIndex===0) $('#results').innerHTML=''; $('#results').append(frag); $('#resultsEmpty').style.display=(topCache.length===0); topIndex=end; $('#btnMore').style.display=(topIndex<topCache.length)?'inline-flex':'none'; }
+  /* Populärt (5 i taget) + oändlig scroll */
+  const TOP_CHUNK=5; let topCache=[]; let topIndex=0; let topKey='GLOBAL'; let io=null;
+  function resetTop(key){ topCache=[]; topIndex=0; topKey=key||'GLOBAL'; detachIO(); }
+  function detachIO(){ if(io){ io.disconnect(); io=null; } }
+  function attachIO(){
+    const sentinel = $('#sentinel');
+    if(!sentinel) return;
+    detachIO();
+    io = new IntersectionObserver((entries)=>{
+      const e = entries[0];
+      if(e && e.isIntersecting && topIndex < topCache.length){
+        renderTopChunk();
+      }
+    }, {root:null, rootMargin:'300px 0px', threshold:0});
+    io.observe(sentinel);
+  }
+  function renderTopChunk(){
+    const end=Math.min(topIndex+TOP_CHUNK,topCache.length);
+    const frag=document.createDocumentFragment();
+    for(let i=topIndex;i<end;i++){ frag.append(stationCard(topCache[i])); }
+    if(topIndex===0) $('#results').innerHTML='';
+    $('#results').append(frag);
+    $('#resultsEmpty').style.display=(topCache.length===0);
+    topIndex=end;
+
+    // flytta sentinel sist i listan
+    const sentinel = $('#sentinel');
+    if(sentinel){ sentinel.remove(); $('#resultsSection').appendChild(sentinel); }
+    // Om inga fler kvar – sluta observera
+    if(topIndex >= topCache.length){ detachIO(); }
+  }
 
   /* Sök & listor */
   async function search(q){
-    $('#results').innerHTML=''; $('#resultsEmpty').style.display='none'; $('#btnMore').style.display='none';
+    // Sök visar alla träffar direkt (ingen oändlig scroll här)
+    detachIO();
+    $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
     const query=(q||'').trim(); const cc=$('#country').value.trim();
     if(!query && cc) return listTop(cc);
     if(!query) return listTop('GLOBAL');
@@ -344,18 +390,22 @@
     const results=settled.filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
     const seen=new Set(); const uniq=[]; for(const st of results){ if(st && !seen.has(st.stationuuid)){ seen.add(st.stationuuid); uniq.push(st); } }
     if(!uniq.length){ $('#resultsEmpty').style.display='block'; return; }
-    const frag=document.createDocumentFragment(); uniq.slice(0,60).forEach(st=>frag.append(stationCard(st))); $('#results').append(frag);
+    const frag=document.createDocumentFragment(); uniq.slice(0,120).forEach(st=>frag.append(stationCard(st))); $('#results').append(frag);
   }
 
   async function listTop(scope){
     const isCountry=scope && scope!=='GLOBAL'; const key=isCountry?`TOP_${scope}`:'GLOBAL';
     if(topKey!==key) resetTop(key);
     $('#results').innerHTML=''; $('#resultsEmpty').style.display='none';
+    const sentinel = $('#sentinel'); if(sentinel) sentinel.style.display='block';
     if(topCache.length===0){
-      let list=[]; if(isCountry){ list=await api(`/json/stations/bycountrycodeexact/${encodeURIComponent(scope)}?hidebroken=true&order=clickcount&reverse=true&limit=100`); } else { list=await api(`/json/stations/topclick?limit=100&hidebroken=true`); }
+      let list=[]; 
+      if(isCountry){ list=await api(`/json/stations/bycountrycodeexact/${encodeURIComponent(scope)}?hidebroken=true&order=clickcount&reverse=true&limit=100`); }
+      else { list=await api(`/json/stations/topclick?limit=100&hidebroken=true`); }
       topCache=Array.isArray(list)?list:[];
     }
     renderTopChunk();
+    attachIO();
   }
 
   /* Länder – alfabetisk sortering */
@@ -379,8 +429,18 @@
   /* Media Session (iOS) */
   function setMediaSession(st, info){
     if(!('mediaSession' in navigator)) return;
-    const p=parseNP(info); const title=p.title||st?.name||'Live'; const artist=p.artist||st?.name||''; const album=st?.name||''; const artwork=st?.favicon&&st.favicon.startsWith('http')?[{src:st.favicon,sizes:'128x128',type:'image/png'}]:[];
-    try{ navigator.mediaSession.metadata=new MediaMetadata({title,artist,album,artwork}); navigator.mediaSession.playbackState=(audio.paused?'paused':'playing'); navigator.mediaSession.setActionHandler('play',()=>audio.play()); navigator.mediaSession.setActionHandler('pause',()=>audio.pause()); navigator.mediaSession.setActionHandler('stop',()=>{try{audio.pause();}catch{}});}catch{}
+    const p=parseNP(info); // redan fixad i setTicker-anropet
+    const title=fixMojibake(p.title)||st?.name||'Live';
+    const artist=fixMojibake(p.artist)||st?.name||'';
+    const album=st?.name||'';
+    const artwork=st?.favicon&&st.favicon.startsWith('http')?[{src:st.favicon,sizes:'128x128',type:'image/png'}]:[];
+    try{
+      navigator.mediaSession.metadata=new MediaMetadata({title,artist,album,artwork});
+      navigator.mediaSession.playbackState=(audio.paused?'paused':'playing');
+      navigator.mediaSession.setActionHandler('play',()=>audio.play());
+      navigator.mediaSession.setActionHandler('pause',()=>audio.pause());
+      navigator.mediaSession.setActionHandler('stop',()=>{try{audio.pause();}catch{}});
+    }catch{}
   }
   function parseNP(info){
     if(!info) return {}; let artist=info?.artist||null, title=info?.title||null, st=info?.streamTitle||'';
@@ -437,7 +497,15 @@
     lastNP={streamTitle:st.name}; setMediaSession(st,lastNP);
 
     clearInterval(npTimer);
-    const tick=async()=>{ try{ const info=await now(currentStream); lastNP=info||lastNP; const p=parseNP(lastNP); const line=(p.artist&&p.title)?`${p.artist} – ${p.title}`:(p.streamTitle||'—'); setTicker(line&&line!=='—'?line:('Lyssnar på '+(st.name||'okänd station'))); setMediaSession(st,lastNP); }catch{} };
+    const tick=async()=>{ try{
+        const info=await now(currentStream); lastNP=info||lastNP;
+        const p=parseNP(lastNP);
+        const lineRaw=(p.artist&&p.title)?`${p.artist} – ${p.title}`:(p.streamTitle||'—');
+        const line=fixMojibake(lineRaw);
+        setTicker(line && line!=='—' ? line : ('Lyssnar på '+(st.name||'okänd station')));
+        setMediaSession(st,lastNP);
+      }catch{}
+    };
     await tick(); npTimer=setInterval(tick,15000);
   }
 
@@ -469,7 +537,8 @@
       if(location.protocol==='https:'&&/^http:\/\//i.test(url)){ const httpsTry=url.replace(/^http:\/\//i,'https://'); try{ await fetch(httpsTry,{method:'HEAD',mode:'no-cors'}); url=httpsTry; }catch{} }
       try{
         const np=await now(url); const p=parseNP(np);
-        const line=(p.artist&&p.title)?`${p.artist} – ${p.title}`:(p.streamTitle||'—');
+        const lineRaw=(p.artist&&p.title)?`${p.artist} – ${p.title}`:(p.streamTitle||'—');
+        const line=fixMojibake(lineRaw);
         const tgt=card.querySelector('[data-role="now"]'); if(tgt) tgt.textContent=line||'—';
       }catch{}
     }};
@@ -485,7 +554,6 @@
   $('#q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ $('#btnSearch').click(); }});
   $('#btnTop').addEventListener('click', ()=>{ document.body.classList.remove('mode-favs'); const cc=$('#country').value.trim(); listTop(cc||'GLOBAL'); window.scrollTo({top:0,behavior:'smooth'}); });
   $('#btnFavs').addEventListener('click', ()=>{ document.body.classList.add('mode-favs'); document.querySelector('#favsSection').scrollIntoView({behavior:'smooth'}); });
-  $('#btnMore').addEventListener('click', renderTopChunk);
   $('#country').addEventListener('change', ()=>{ const q=$('#q').value.trim(); document.body.classList.remove('mode-favs'); if(q) search(q); else listTop($('#country').value.trim()||'GLOBAL'); });
 
   /* Init */
